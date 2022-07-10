@@ -128,3 +128,33 @@ after running:
   ```
 
   This command can install all the dependencies and devDependencies from `packages` and `plats` into the root `node_modules`.
+
+### use start command
+
+The `start` command can start a platform development. It runs `npm start` command in platform `package.json > scripts.start`.
+
+```
+$ pmnps start
+```
+
+or
+
+```
+$ pmnps start -p <platform>
+```
+
+### use build command
+
+The `build` command can build platforms. It runs `npm run build` command in platform `package.json > scripts.build`.
+
+```
+# build all platforms
+$ pmnps build
+```
+
+or
+
+```
+# build a special platform
+$ pmnps build -p <platform>
+```

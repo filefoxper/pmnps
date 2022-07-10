@@ -10,10 +10,11 @@ import {
   copyResource,
 } from "../file";
 import path from "path";
-import { packageJsonDevDependencies, selectJsFormat } from "../resource";
+import {basicDevDependencies, selectJsFormat} from "../resource";
 import fs from "fs";
 import { PackConfig } from "../type";
 import { refreshAction } from "./refresh";
+import { success } from "../info";
 
 const configName = "pmnp.pack.json";
 
@@ -30,13 +31,16 @@ function createPackPackageJson(name: string, fileEnd: string) {
         "react-dom": "16.14.0",
       }
     : {};
+  const moduleFile = `index.${fileEnd}`;
   const json = {
     name,
     description: "This is a package in monorepo project",
+    module: moduleFile,
     version: "1.0.0",
+    files: ["src", moduleFile],
     dependencies: reactDep,
     devDependencies: {
-      ...packageJsonDevDependencies,
+      ...basicDevDependencies,
       ...tsDep,
     },
   };
@@ -155,6 +159,7 @@ function commandPack(program: Command) {
         cwd: rootPath,
       });
       await refreshAction();
+      success(`create package "${name}" success`);
     });
 }
 

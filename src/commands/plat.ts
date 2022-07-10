@@ -10,10 +10,11 @@ import {
   copyResource,
 } from "../file";
 import path from "path";
-import { packageJsonDevDependencies, selectJsFormat } from "../resource";
+import {basicDevDependencies, selectJsFormat} from "../resource";
 import fs from "fs";
 import { PackConfig } from "../type";
 import { refreshAction } from "./refresh";
+import { success } from "../info";
 
 const configName = "pmnp.plat.json";
 
@@ -34,9 +35,13 @@ function createPlatPackageJson(name: string, fileEnd: string) {
     name,
     description: "This is a package in monorepo project",
     version: "1.0.0",
+    scripts:{
+      start:'node -v',
+      build:'node -v'
+    },
     dependencies: reactDep,
     devDependencies: {
-      ...packageJsonDevDependencies,
+      ...basicDevDependencies,
       ...tsDep,
     },
   };
@@ -154,6 +159,7 @@ function commandPlat(program: Command) {
         cwd: rootPath,
       });
       await refreshAction();
+      success(`create platform "${name}" success`);
     });
 }
 

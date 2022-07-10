@@ -6,7 +6,7 @@ import {
   rootPath,
   writeRootPackageJson,
 } from "../file";
-import { desc, error } from "../info";
+import {desc, error, success, warn} from "../info";
 import path from "path";
 import fs from "fs";
 
@@ -16,12 +16,15 @@ const packsPath = path.join(projectPath, "packages");
 
 const platsPath = path.join(projectPath, "plats");
 
-function removeDepPacks(packageJson:Record<string, any>,packs:string[]):Record<string, any>{
+function removeDepPacks(
+  packageJson: Record<string, any>,
+  packs: string[]
+): Record<string, any> {
   const packSet = new Set(packs);
-  const {dependencies} = packageJson;
-  const e = Object.entries(dependencies).filter(([k])=>!packSet.has(k));
+  const { dependencies } = packageJson;
+  const e = Object.entries(dependencies).filter(([k]) => !packSet.has(k));
   const newDep = Object.fromEntries(e);
-  return {...packageJson,dependencies:newDep};
+  return { ...packageJson, dependencies: newDep };
 }
 
 function combineDeps() {
@@ -39,8 +42,8 @@ function combineDeps() {
       devDependencies: { ...data.devDependencies, ...devDependencies },
     };
   }, root);
-  const validPackageJson = removeDepPacks(packageJson,list);
-  const finalPackageJson = list.reduce((data, name) => {
+  const plats = fs.readdirSync(platsPath);
+  const finalPackageJson = plats.reduce((data, name) => {
     const current = readPackageJson(path.join(platsPath, name, "package.json"));
     if (!current) {
       return data;
@@ -51,10 +54,11 @@ function combineDeps() {
       dependencies: { ...data.dependencies, ...dependencies },
       devDependencies: { ...data.devDependencies, ...devDependencies },
     };
-  }, validPackageJson);
+  }, packageJson);
+  const validPackageJson = removeDepPacks(finalPackageJson, list);
   fs.writeFileSync(
     path.join(projectPath, "package.json"),
-    JSON.stringify(finalPackageJson)
+    JSON.stringify(validPackageJson)
   );
 }
 
@@ -64,18 +68,21 @@ async function refreshAction() {
     cwd: rootPath,
   });
   if (stderr) {
-    error(stderr);
+    warn(stderr);
   } else {
     desc(stdout);
   }
-  await execa("prettier", ["--write", "."], { cwd: projectPath });
+  await execa("prettier", ["--write", path.join(rootPath,'package.json')], { cwd: projectPath });
 }
 
 function commandRefresh(program: Command) {
   program
     .command("refresh")
     .description("Refresh `packages & plats` to link the unlink packages.")
-    .action(refreshAction);
+    .action(async () => {
+      await refreshAction();
+      success("refresh success");
+    });
 }
 
 export { commandRefresh, refreshAction };

@@ -67,9 +67,9 @@ after running:
   - plats
   package.json
   pmnps.json
-  ```
+```
 
-  This command can add a package and install the dependencies and devDependencies into root `node_modules`.
+This command can add a package and install the dependencies and devDependencies into root `node_modules`.
 
 ### use plat command
 
@@ -96,7 +96,7 @@ after running:
       pmnps.plat.json
   package.json
   pmnps.json
-  ```
+```
 
 This command can add a platform and install the dependencies and devDependencies into root `node_modules`.
 
@@ -125,9 +125,9 @@ after running:
       pmnps.plat.json
   package.json
   pmnps.json
-  ```
+```
 
-  This command can install all the dependencies and devDependencies from `packages` and `plats` into the root `node_modules`.
+This command can install all the dependencies and devDependencies from `packages` and `plats` into the root `node_modules`.
 
 ### use start command
 

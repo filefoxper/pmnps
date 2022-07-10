@@ -1,6 +1,6 @@
 {
   "name": "pmnps",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "bin/pmnps.js",
   "typings": "index.d.ts",
   "author": "Jimmy.Harding",
@@ -10,7 +10,7 @@
     "clear": "rm -rf ./bin",
     "build": "esbuild ./src/index.ts --outfile=./bin/pmnps.js --bundle --target=node12 --platform=node --format=cjs"
   },
-  "bin":{
+  "bin": {
     "pmnps": "bin/pmnps.js"
   },
   "repository": {

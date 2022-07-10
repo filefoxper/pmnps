@@ -1,5 +1,5 @@
-process.env.NODE_ENV = "development";
+process.env.NODE_ENV = 'development';
 
-const { startup } = require("./main");
+const { startup } = require('./main');
 
 startup();

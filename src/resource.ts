@@ -38,8 +38,14 @@ const prettier = {
   arrowParens: 'avoid'
 };
 
+const gitignore =`
+node_modules/
+/.idea/
+/.vscode/
+`;
+
 const basicDevDependencies = {
   prettier: '^2.7.0'
 };
 
-export { selectJsFormat, basicDevDependencies, prettier };
+export { selectJsFormat, basicDevDependencies, prettier,gitignore };

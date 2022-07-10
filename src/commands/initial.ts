@@ -1,22 +1,24 @@
-import { Command } from 'commander'
-import inquirer from 'inquirer'
+import { Command } from 'commander';
+import inquirer from 'inquirer';
 import {
   mkdirIfNotExist,
   rootPath,
   writeConfig,
   writeRootPackageJson,
-  copyResource
-} from '../file'
-import { desc, error, info, success, warn } from '../info'
-import path from 'path'
-import execa from 'execa'
-import { refreshAction } from './refresh'
+  copyResource,
+  createFileIfNotExist
+} from '../file';
+import { desc, error, info, success, warn } from '../info';
+import path from 'path';
+import execa from 'execa';
+import { refreshAction } from './refresh';
+import {gitignore, prettier} from '../resource';
 
-const projectPath = rootPath
+const projectPath = rootPath;
 
-const packsPath = path.join(projectPath, 'packages')
+const packsPath = path.join(projectPath, 'packages');
 
-const platsPath = path.join(projectPath, 'plats')
+const platsPath = path.join(projectPath, 'plats');
 
 function commandInitial(program: Command) {
   program
@@ -29,50 +31,53 @@ function commandInitial(program: Command) {
           type: 'input',
           message: 'Please enter the workspace name',
           default() {
-            return 'workspace'
+            return 'workspace';
           }
         }
-      ])
+      ]);
       try {
-        info('build project...')
-        writeConfig({ workspace })
-        mkdirIfNotExist(packsPath)
-        mkdirIfNotExist(platsPath)
-        writeRootPackageJson(workspace)
-        const { git, install } = await inquirer.prompt([
+        info('build project...');
+        writeConfig({ workspace });
+        mkdirIfNotExist(packsPath);
+        mkdirIfNotExist(platsPath);
+        writeRootPackageJson(workspace);
+        const { git } = await inquirer.prompt([
           {
             name: 'git',
             type: 'confirm',
             message: 'Is that a git project?'
-          },
-          {
-            name: 'install',
-            type: 'confirm',
-            message: 'Do you want to install packages immediately?'
           }
-        ])
+        ]);
+        createFileIfNotExist(
+          path.join(rootPath, '.prettierrc.json'),
+          JSON.stringify(prettier)
+        );
         if (git) {
-          writeConfig({ git: true })
+          writeConfig({ git: true });
+          createFileIfNotExist(
+            path.join(rootPath, '.gitignore'),
+            gitignore
+          );
           await execa(
             'git',
             [
               'add',
               path.join(rootPath, 'package.json'),
-              path.join(rootPath, 'pmnps.json')
+              path.join(rootPath, 'pmnps.json'),
+              path.join(rootPath, '.prettierrc.json'),
+              path.join(rootPath, '.gitignore')
             ],
             {
               cwd: rootPath
             }
-          )
+          );
         }
-        if (install) {
-          await refreshAction()
-        }
-        success('initial success!')
+        await refreshAction();
+        success('initial success!');
       } catch (e) {
-        error('initial failed!')
+        error('initial failed!');
       }
-    })
+    });
 }
 
-export { commandInitial }
+export { commandInitial };

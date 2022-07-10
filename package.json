@@ -1,6 +1,6 @@
 {
   "name": "pmnps",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "bin/pmnps.js",
   "typings": "index.d.ts",
   "author": "Jimmy.Harding",
@@ -15,9 +15,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/filefoxper/agent-reducer"
+    "url": "https://github.com/filefoxper/pmnps"
   },
-  "homepage": "https://filefoxper.github.io/agent-reducer/#/",
+  "homepage": "https://github.com/filefoxper/pmnps",
   "files": [
     "bin",
     "src",

@@ -12,7 +12,7 @@ function defineCommander() {
   program
     .name("mnp")
     .description("This is a tool to build monorepo platforms.")
-    .version("1.0.0");
+    .version("1.0.1");
 }
 
 function npmSupport(){

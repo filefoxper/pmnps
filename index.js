@@ -1,1 +1,1 @@
-module.exports = require("./bin/pmnps.js");
+module.exports = require('./bin/pmnps.js');

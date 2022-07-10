@@ -1,48 +1,48 @@
-const webpack = require("webpack");
+const webpack = require('webpack');
 
 const BundleAnalyzerPlugin =
-  require("webpack-bundle-analyzer").BundleAnalyzerPlugin;
+  require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 
-const TsconfigPathsPlugin = require("tsconfig-paths-webpack-plugin");
+const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
 
-const TerserPlugin = require("terser-webpack-plugin");
+const TerserPlugin = require('terser-webpack-plugin');
 
-const pathBuilder = require("path");
+const pathBuilder = require('path');
 
-const entryPath = pathBuilder.resolve("src", "index.ts");
+const entryPath = pathBuilder.resolve('src', 'index.ts');
 
-const targetPath = pathBuilder.resolve("dist");
+const targetPath = pathBuilder.resolve('dist');
 
-const esmTargetPath = pathBuilder.resolve("esm");
+const esmTargetPath = pathBuilder.resolve('esm');
 
 function entry(env, { name, output, configFile }) {
   return {
-    mode: "production",
+    mode: 'production',
     devtool: false,
     entry: {
-      [name]: entryPath,
+      [name]: entryPath
     },
     output: {
       path: output || targetPath,
-      filename: "[name].js",
-      library: "agent-reducer",
-      libraryTarget: "umd",
+      filename: '[name].js',
+      library: 'agent-reducer',
+      libraryTarget: 'umd'
     },
     optimization: {
       minimize: true,
       minimizer: [
         new TerserPlugin({
-          extractComments: false,
-        }),
-      ],
+          extractComments: false
+        })
+      ]
     },
     resolve: {
       plugins: [
         new TsconfigPathsPlugin({
-          configFile: pathBuilder.resolve("src", "tsconfig.json"),
-        }),
+          configFile: pathBuilder.resolve('src', 'tsconfig.json')
+        })
       ],
-      extensions: [".js", ".ts", ".tsx", ".json", "txt"],
+      extensions: ['.js', '.ts', '.tsx', '.json', 'txt']
     },
     module: {
       rules: [
@@ -51,37 +51,37 @@ function entry(env, { name, output, configFile }) {
           exclude: /(node_modules|bower_components)/,
           use: [
             {
-              loader: "babel-loader",
+              loader: 'babel-loader',
               options: configFile
                 ? {
                     cacheDirectory: true,
-                    configFile,
+                    configFile
                   }
                 : {
-                    cacheDirectory: true,
-                  },
-            },
-          ],
-        },
-      ],
+                    cacheDirectory: true
+                  }
+            }
+          ]
+        }
+      ]
     },
     plugins: [
       new webpack.DefinePlugin({
-        "process.env": {
-          NODE_ENV: JSON.stringify("production"),
-        },
-      }),
+        'process.env': {
+          NODE_ENV: JSON.stringify('production')
+        }
+      })
     ].concat(
       env.analyze ? new BundleAnalyzerPlugin({ analyzerPort: 6660 }) : []
-    ),
+    )
   };
 }
 
 module.exports = [
   function (env) {
-    return entry(env, { name: "agent-reducer.mini" });
+    return entry(env, { name: 'agent-reducer.mini' });
   },
   function (env) {
-    return entry(env, { name: "index", output: esmTargetPath });
-  },
+    return entry(env, { name: 'index', output: esmTargetPath });
+  }
 ];

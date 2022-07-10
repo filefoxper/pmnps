@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import { startup } from "./main";
+import { startup } from './main';
 
 startup();

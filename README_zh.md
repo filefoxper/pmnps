@@ -63,7 +63,7 @@ $ pmnps pack -n test
   - plats
   package.json
   pmnps.json
-  ```
+```
 
 该命令用于添加一个 package 平台依赖包，并将依赖安装至根 `node_modules` 目录。
 
@@ -92,7 +92,7 @@ $ pmnps plat -n web-test
       pmnps.plat.json
   package.json
   pmnps.json
-  ```
+```
 
 该命令用于添加一个 platform 平台项目入口，并将依赖安装至根 `node_modules` 目录。
 
@@ -121,9 +121,9 @@ $ pmnps refresh
       pmnps.plat.json
   package.json
   pmnps.json
-  ```
+```
 
-  该命令用于刷新项目，并将所有第三方依赖安装至根 `node_modules` 目录。
+该命令用于刷新项目，并将所有第三方依赖安装至根 `node_modules` 目录。
 
 ### 使用 start 命令
 
@@ -154,4 +154,3 @@ $ pmnps build
 # 编译指定平台
 $ pmnps build -p <platform>
 ```
-

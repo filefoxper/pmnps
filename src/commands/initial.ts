@@ -53,7 +53,6 @@ function commandInitial(program: Command) {
           JSON.stringify(prettier)
         );
         if (git) {
-          writeConfig({ git: true });
           createFileIfNotExist(
             path.join(rootPath, '.gitignore'),
             gitignore
@@ -71,6 +70,7 @@ function commandInitial(program: Command) {
               cwd: rootPath
             }
           );
+          writeConfig({ git: true });
         }
         await refreshAction();
         success('initial success!');

@@ -69,7 +69,7 @@ function createTsConfig(name: string, fileEnd: 'ts' | 'tsx' | 'js' | 'jsx') {
     noEmit: true,
     skipLibCheck: true,
     paths: {
-      [`${name}/src/*`]: ['src/*'],
+      "@/*": ["src/*"],
       '@test/*': ['test/*']
     },
     noImplicitAny: false,

@@ -125,4 +125,33 @@ $ pmnps refresh
 
   该命令用于刷新项目，并将所有第三方依赖安装至根 `node_modules` 目录。
 
+### 使用 start 命令
+
+`start` 命令用于启动单个平台的 `npm start` 脚本，请在启用前配置 `package.json > scripts.start`。
+
+```
+$ pmnps start
+```
+
+或
+
+```
+$ pmnps start -p <platform>
+```
+
+### 使用 build 命令
+
+`build` 命令用于启动多个或单个平台的 `npm run build` 脚本，请在启用前配置 `package.json > scripts.build`。
+
+```
+# 编译所有平台
+$ pmnps build
+```
+
+或
+
+```
+# 编译指定平台
+$ pmnps build -p <platform>
+```
 

@@ -10,6 +10,7 @@ import {
 import {desc, error, info, success, warn} from "../info";
 import path from "path";
 import execa from "execa";
+import {refreshAction} from "./refresh";
 
 const projectPath = rootPath;
 
@@ -46,16 +47,7 @@ function commandInitial(program: Command) {
           },
         ]);
         if (install) {
-          info(`install dependencies...`);
-          const { stdout, stderr } = await execa("npm", ["install"], {
-            cwd: projectPath,
-          });
-          if (stderr) {
-            warn(stderr);
-          } else {
-            desc(stdout);
-          }
-          await execa("prettier", ["--write", "."], { cwd: projectPath });
+          await refreshAction();
         }
         success("initial success!");
       } catch (e) {

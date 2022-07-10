@@ -2,7 +2,7 @@ import fs from "fs";
 import { Config } from "./type";
 import path from "path";
 import { error } from "./info";
-import { eslint, packageJsonDevDependencies, prettier } from "./resource";
+import {basicDevDependencies, prettier} from "./resource";
 
 const actualRootPath = process.cwd();
 
@@ -38,20 +38,22 @@ function writePackageJson(
   locationPath: string,
   packageJson: Record<string, any>
 ) {
-  const { name, ...prev } = packageJson;
-  const end = { name };
+  const { name, version, ...prev } = packageJson;
+  const end = { name, version };
   const source = readPackageJson(locationPath);
   const content = JSON.stringify({ ...prev, ...source, ...end });
   fs.writeFileSync(locationPath, content);
 }
 
-function generateNewDevDep(packageJson:Record<string, any>|undefined){
-  if(!packageJson){
-    return packageJsonDevDependencies;
+function generateNewDevDep(packageJson: Record<string, any> | undefined) {
+  if (!packageJson) {
+    return basicDevDependencies;
   }
   const sourceDev = packageJson.devDependencies;
-  const e = Object.entries(packageJsonDevDependencies);
-  const entries = e.map(([k,v])=>sourceDev[k]?[k,sourceDev[k]]:[k,v]);
+  const e = Object.entries(basicDevDependencies);
+  const entries = e.map(([k, v]) =>
+    sourceDev[k] ? [k, sourceDev[k]] : [k, v]
+  );
   return Object.fromEntries(entries);
 }
 
@@ -61,7 +63,7 @@ function writeRootPackageJson(workspace: string) {
     description: "project of monorepo platforms",
     dependencies: {},
     devDependencies: {
-      ...packageJsonDevDependencies,
+      ...basicDevDependencies,
     },
   };
   const addition = {
@@ -74,7 +76,7 @@ function writeRootPackageJson(workspace: string) {
     ...preAddition,
     ...packageJson,
     ...addition,
-    devDependencies:newDev
+    devDependencies: newDev,
   });
   fs.writeFileSync(packageJsonPath, content);
 }
@@ -127,17 +129,12 @@ function createFileIfNotExist(filePath: string, content: string = "") {
     createFile(filePath, content);
   }
 }
-
-function copyResource(dirPath: string) {
+// TODO copy resource file from sourceDirPath to targetDirPath
+function copyResource(targetDirPath: string,sourceDirPath?:string) {
   createFileIfNotExist(
-    path.join(dirPath, "prettierrc.json"),
+    path.join(targetDirPath, "prettierrc.json"),
     JSON.stringify(prettier)
   );
-  createFileIfNotExist(
-    path.join(dirPath, "eslintrc.js"),
-    `module.exports = ${JSON.stringify(eslint)}`
-  );
-  createFileIfNotExist(path.join(dirPath, "eslintignore"));
 }
 
 function createFileIntoDirIfNotExist(

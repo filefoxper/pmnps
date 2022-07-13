@@ -194,6 +194,18 @@ async function prettierProject(name: string, isNew: boolean) {
     await execa('prettier', ['--write', path.join(packsPath, name)], {
       cwd: rootPath
     });
+  } else {
+    await execa(
+      'prettier',
+      [
+        '--write',
+        path.join(packsPath, name, 'package.json'),
+        path.join(packsPath, name, configName)
+      ],
+      {
+        cwd: rootPath
+      }
+    );
   }
 }
 
@@ -203,9 +215,15 @@ async function gitAddition(
   git?: boolean
 ): Promise<void> {
   if (git) {
-    await execa('git', ['add', path.join(packsPath, name)], {
-      cwd: rootPath
-    });
+    if (isNew) {
+      await execa('git', ['add', path.join(packsPath, name)], {
+        cwd: rootPath
+      });
+    } else {
+      await execa('git', ['add', path.join(packsPath, name, configName)], {
+        cwd: rootPath
+      });
+    }
   }
 }
 

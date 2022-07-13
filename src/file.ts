@@ -3,6 +3,7 @@ import { Config } from './type';
 import path from 'path';
 import { error } from './info';
 import { basicDevDependencies, prettier } from './resource';
+import {resolve} from "eslint-import-resolver-typescript";
 
 const actualRootPath = process.cwd();
 
@@ -81,7 +82,7 @@ function writeRootPackageJson(workspace: string) {
   fs.writeFileSync(packageJsonPath, content);
 }
 
-function readPackageJson(locationPath: string) {
+function readPackageJson(locationPath: string,silence?:boolean) {
   if (!fs.existsSync(locationPath)) {
     return undefined;
   }
@@ -90,7 +91,37 @@ function readPackageJson(locationPath: string) {
     const content = data.toString('utf-8');
     return JSON.parse(content);
   } catch (e) {
-    error('The `package.json` file is invalidate, please check the format.');
+    if(!silence){
+      error('The `package.json` file is invalidate, please check the format.');
+    }
+    return undefined;
+  }
+}
+
+function readJsonAsync(locationPath: string){
+  return new Promise((resolve, reject)=>{
+    fs.readFile(locationPath,(err, data)=>{
+      if(err){
+        reject(err);
+        return;
+      }
+      const content = data.toString('utf-8');
+      resolve(JSON.parse(content));
+    })
+  });
+}
+
+async function readPackageJsonAsync(locationPath: string,silence?:boolean){
+  if(!fs.existsSync(locationPath)){
+    return undefined;
+  }
+  try {
+    const data = await readJsonAsync(locationPath);
+    return data as Record<string, any>;
+  }catch (e){
+    if(!silence){
+      error('The `package.json` file is invalidate, please check the format.');
+    }
     return undefined;
   }
 }
@@ -151,6 +182,23 @@ function createFileIntoDirIfNotExist(
   }
 }
 
+function copyFolder(sourceDirPath: string, targetDirPath: string) {
+  return new Promise((resolve, reject) => {
+    fs.cp(
+      sourceDirPath,
+      targetDirPath,
+      { recursive: true, force: false },
+      err => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve(true);
+      }
+    );
+  });
+}
+
 export {
   mkdirIfNotExist,
   writeTsConfig,
@@ -164,5 +212,7 @@ export {
   createFileIfNotExist,
   createFileIntoDirIfNotExist,
   copyResource,
+  copyFolder,
+  readPackageJsonAsync,
   rootPath
 };

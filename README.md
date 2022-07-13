@@ -45,7 +45,7 @@ after running:
   pmnps.json
 ```
 
-This command can create a monorepo project and install the dependencies and devDependencies into root `node_modules`.
+This command can create a monorepo project and install the `dependencies & devDependencies` into root `node_modules`.
 
 ### use pack command
 
@@ -69,7 +69,7 @@ after running:
   pmnps.json
 ```
 
-This command can add a package and install the dependencies and devDependencies into root `node_modules`.
+This command can add a package and install the `dependencies & devDependencies` into root `node_modules`.
 
 ### use plat command
 
@@ -158,3 +158,90 @@ or
 # build a special platform
 $ pmnps build -p <platform>
 ```
+
+If you want to build with a mode you set with command `config`, you can use option param `-m <mode>`.
+
+```
+$ pmnps build -p <platform> -m <mode>
+```
+
+### use config command
+
+The `config` command allows you to do more configs. You can open `git usage`, `rename workspace` and add `build mode` for your project. The `build mode` is a string word which will be added into your `package.json > scripts` like `scripts.build-<mode>`, when you use command `build` with option `-m <mode>`, it runs `npm run build-<mode>` script.
+
+```
+$ pmnps config
+```
+
+### use template command
+
+The `template` command can help you build some templates for `packages` and `plats`. When you use `pack` or `plat` command to build a project, it can be helpful.
+
+```
+$ pmnps template
+```
+
+## Package.json config
+
+Now, you can add `pmnps` property into your package.json in platforms or packages.
+
+### platform config
+
+Add `pmnps.platDependencies` config to describe the build dependencies in platforms.
+
+platA -> package.json
+
+```
+{
+  "private": true,
+  "name": "platA",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "...start",
+    "build": "... build",
+    "build-inside": ".... build inside mode" 
+  },
+  "pmnps": {
+    "platDependencies": [
+      "platB"
+    ]
+  }
+}
+```
+
+platB -> package.json
+
+```
+{
+  "private": true,
+  "name": "platB",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "...start",
+    "build": "... build",
+    "build-inside": ".... build inside mode" 
+  },
+  "pmnps": {
+    "platDependencies": [
+      "platC"
+    ]
+  }
+}
+```
+
+platC -> package.json
+
+```
+{
+  "private": true,
+  "name": "platC",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "...start",
+    "build": "... build",
+    "build-inside": ".... build inside mode" 
+  }
+}
+```
+
+So, when use command `build`, it will follow the `platDependencies` build one by one, `build platC -> build platB -> build platA`.

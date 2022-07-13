@@ -154,3 +154,86 @@ $ pmnps build
 # 编译指定平台
 $ pmnps build -p <platform>
 ```
+
+如果想要使用通过命令 `config` 预先设置的 build 模式来代替当前的 `npm run build` 脚本，我们可以使用 `-m <mode>` 选项。
+
+```
+$ pmnps build -m <mode>
+```
+
+### 使用 config 命令
+
+`config` 命令用于配置部分 pmnp 设置，如：启用 git、重命名 workspace、设置 build 模式。build 模式，可以在 build 命令中通过选项 `-m <mode>` 来使用。当我们使用 `plat` 或 `pack` 命令新建项目包时，`packaghe.json > scripts` 中会自动加入所有的 build 模式脚本，`"build-<mode>":"......"`
+
+```
+$ pmnps config
+```
+
+### 使用 template 命令
+
+`template` 命令可以帮助我们创建相关 package 和 platform 的模版项目，在我们使用 `plat` 或 `pack` 命令时，能获取到它的帮助。
+
+## 配置 package.json
+
+我们可以通过添加 "pmnps" 属性来使用 pmnps 的增强功能。
+
+### platform 配置
+
+通过使用 `pmnps.platDependencies` 配置可以描述出平台项目之间的 build 依赖关系，在我们运行 `build` 命令时， pmnps 会按照我们的描述逐一编译。
+
+platA -> package.json
+
+```
+{
+  "private": true,
+  "name": "platA",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "...start",
+    "build": "... build",
+    "build-inside": ".... build inside mode" 
+  },
+  "pmnps": {
+    "platDependencies": [
+      "platB"
+    ]
+  }
+}
+```
+
+platB -> package.json
+
+```
+{
+  "private": true,
+  "name": "platB",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "...start",
+    "build": "... build",
+    "build-inside": ".... build inside mode" 
+  },
+  "pmnps": {
+    "platDependencies": [
+      "platC"
+    ]
+  }
+}
+```
+
+platC -> package.json
+
+```
+{
+  "private": true,
+  "name": "platC",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "...start",
+    "build": "... build",
+    "build-inside": ".... build inside mode" 
+  }
+}
+```
+
+通过运行 `build` 命令，我们可以观察到 `build platC -> build platB -> build platA` 这样的编译顺序。

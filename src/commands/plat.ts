@@ -204,7 +204,19 @@ function createPlat(
   createTsConfig(name, fileEnd);
 }
 
-async function gitAddition(name: string, git?: boolean): Promise<void> {
+async function prettierProject(name: string, isNew: boolean) {
+  if (isNew) {
+    await execa('prettier', ['--write', path.join(platsPath, name)], {
+      cwd: rootPath
+    });
+  }
+}
+
+async function gitAddition(
+  name: string,
+  isNew: boolean,
+  git?: boolean
+): Promise<void> {
   if (git) {
     await execa('git', ['add', path.join(platsPath, name)], {
       cwd: rootPath
@@ -253,16 +265,15 @@ async function platAction({ name: n }: { name?: string } | undefined = {}) {
     if (fileEnd.startsWith('ts')) {
       copyResource(path.join(platsPath, name));
     }
-  }else{
+  } else {
     log('config plat...');
   }
   writePlatConfig(name, formats || ['js']);
   const { git } = rootConfig;
+  const isNew = !config;
   await Promise.all([
-    execa('prettier', ['--write', path.join(platsPath, name)], {
-      cwd: rootPath
-    }),
-    gitAddition(name, git)
+    prettierProject(name, isNew),
+    gitAddition(name, isNew, git)
   ]);
   await refreshAction();
   success(`create platform "${name}" success`);

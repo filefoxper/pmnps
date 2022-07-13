@@ -21,12 +21,19 @@ function validPlatform(platform: string): boolean {
 function fetchPlatforms() {
   const formDirPath = path.join(platsPath);
   const list = fs.readdirSync(formDirPath);
-  return list.filter(n =>
-    fs.existsSync(path.join(platsPath, n, 'pmnp.plat.json'))
-  );
+  return list.filter(n =>{
+    const isValid = fs.existsSync(path.join(platsPath, n, 'pmnp.plat.json'));
+    if (!isValid) {
+      return false;
+    }
+    const json =
+        readPackageJson(path.join(platsPath, n, 'package.json'), true) || {};
+    const { scripts = {} } = json;
+    return !!scripts.start;
+  });
 }
 
-async function startAction({ plat: startPlat }: { plat?: string }) {
+async function startAction({ plat: startPlat }: { plat?: string }|undefined = {}) {
   let platform = startPlat;
   const forms = fetchPlatforms();
   if (!forms.length) {
@@ -44,9 +51,14 @@ async function startAction({ plat: startPlat }: { plat?: string }) {
     ]);
     platform = plat;
   }
-  info(`start developing platform: ${platform || ''}`);
+  if (!platform){
+    error('The platform name should not be null, when use command `start`');
+    return;
+  }
+  const platPath = path.join(platsPath, platform);
+  info(`start developing platform: ${platform}`);
   const subprocess = execa('npm', ['start'], {
-    cwd: path.join(platsPath, platform || '')
+    cwd: platPath
   });
   // @ts-ignore
   subprocess.stderr.pipe(process.stderr);

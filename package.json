@@ -1,6 +1,6 @@
 {
   "name": "pmnps",
-  "version": "1.0.6",
+  "version": "1.1.0",
   "main": "bin/pmnps.js",
   "typings": "index.d.ts",
   "author": "Jimmy.Harding",
@@ -8,7 +8,7 @@
   "scripts": {
     "start": "ts-node ./src/test.index.ts",
     "clear": "rm -rf ./bin",
-    "build": "esbuild ./src/index.ts --outfile=./bin/pmnps.js --bundle --target=node12 --platform=node --format=cjs"
+    "build": "esbuild ./src/index.ts --outfile=./bin/pmnps.js --bundle --target=node17 --platform=node --format=cjs"
   },
   "preferGlobal": true,
   "bin": {

@@ -8,20 +8,22 @@ import {
   writePackageJson,
   writeTsConfig,
   copyResource,
-  readConfig
+  readConfig,
+  writeConfig,
+  copyFolder
 } from '../file';
 import path from 'path';
 import { basicDevDependencies, selectJsFormat } from '../resource';
 import fs from 'fs';
-import { PackConfig } from '../type';
+import { Config, PackConfig, TemplateConfig } from '../type';
 import { refreshAction } from './refresh';
-import { success } from '../info';
+import {error, success, warn} from '../info';
 
 const configName = 'pmnp.plat.json';
 
 const platsPath = path.join(rootPath, 'plats');
 
-function createPlatPackageJson(name: string, fileEnd: string) {
+function createPlatPackageJson(name: string, fileEnd: string,rootConfig:Config) {
   const isTs = fileEnd.startsWith('ts');
   const isReact = fileEnd.endsWith('x');
   const packageJsonPath = path.join(platsPath, name, 'package.json');
@@ -32,13 +34,17 @@ function createPlatPackageJson(name: string, fileEnd: string) {
         'react-dom': '16.14.0'
       }
     : {};
+  const {buildModes=[]} = rootConfig;
+  const modeEntries = buildModes.map((mode:string)=>[`build-${mode}`,'echo Please edit a build script.']);
+  const buildModeScripts = Object.fromEntries(modeEntries);
   const json = {
     name,
     description: 'This is a package in monorepo project',
     version: '1.0.0',
     scripts: {
-      start: 'node -v',
-      build: 'node -v'
+      start: 'echo Please edit a start script.',
+      build: 'echo Please edit a build script.',
+      ...buildModeScripts
     },
     dependencies: reactDep,
     devDependencies: {
@@ -69,7 +75,7 @@ function createTsConfig(name: string, fileEnd: 'ts' | 'tsx' | 'js' | 'jsx') {
     noEmit: true,
     skipLibCheck: true,
     paths: {
-      "@/*": ["src/*"],
+      '@/*': ['src/*'],
       '@test/*': ['test/*']
     },
     noImplicitAny: false,
@@ -106,7 +112,77 @@ function writePlatConfig(
   );
 }
 
-function createPlat(name: string, formats: ('ts' | 'tsx' | 'js' | 'jsx')[]) {
+function readTemplates(): string[] {
+  const templatesPath = path.join(rootPath, 'templates');
+  if (
+    !fs.existsSync(templatesPath) ||
+    !fs.statSync(templatesPath).isDirectory()
+  ) {
+    return [];
+  }
+  const list = fs.readdirSync(templatesPath);
+  return list.filter(d => {
+    const detailPath = path.join(templatesPath, d);
+    const detailConfigPath = path.join(detailPath, 'pmnps.template.json');
+    if (
+      !fs.existsSync(detailPath) ||
+      !fs.statSync(detailPath).isDirectory() ||
+      !fs.existsSync(detailConfigPath)
+    ) {
+      return false;
+    }
+    const buffer = fs.readFileSync(detailConfigPath);
+    const { type } = JSON.parse(buffer.toString('utf-8')) as TemplateConfig;
+    return type === 'platform';
+  });
+}
+
+async function copyProject(name:string,tempName:string){
+  await copyFolder(
+      path.join(rootPath, 'templates', tempName),
+      path.join(platsPath, name)
+  );
+  writePackageJson(path.join(platsPath, name,'package.json'),{name});
+  fs.unlinkSync(path.join(platsPath, name,'pmnps.template.json'));
+}
+
+async function copyTemplate(
+  name: string,
+): Promise<boolean> {
+  let useTemplate = false;
+  const templates = readTemplates();
+  if (templates.length) {
+    const { useTemp } = await inquirer.prompt([
+      {
+        name: 'useTemp',
+        type: 'confirm',
+        message: 'There are some templates, do you want to use them?'
+      }
+    ]);
+    useTemplate = useTemp;
+  }
+  if (useTemplate && templates.length) {
+    if (templates.length === 1) {
+      const [tempName] = templates;
+      await copyProject(name,tempName);
+      return true;
+    }
+    const { temp } = await inquirer.prompt([
+      {
+        name: 'temp',
+        type: 'list',
+        message: 'Please choice your template:',
+        choices: templates,
+        default: templates[0]
+      }
+    ]);
+    await copyProject(name,temp);
+    return true;
+  }
+  return false;
+}
+
+function createPlat(name: string, formats: ('ts' | 'tsx' | 'js' | 'jsx')[],rootConfig:Config) {
   mkdirIfNotExist(path.join(platsPath, name));
   mkdirIfNotExist(path.join(platsPath, name, 'src'));
   const fileEnd = selectJsFormat(formats);
@@ -115,8 +191,63 @@ function createPlat(name: string, formats: ('ts' | 'tsx' | 'js' | 'jsx')[]) {
     `index.${fileEnd}`,
     ['ts', 'tsx', 'js', 'jsx']
   );
-  createPlatPackageJson(name, fileEnd);
+  createPlatPackageJson(name, fileEnd,rootConfig);
   createTsConfig(name, fileEnd);
+}
+
+async function platAction({name:n}:{name?:string}|undefined = {}){
+  const rootConfig = readConfig();
+  if (!rootConfig) {
+    return;
+  }
+  let name = n && n.trim() ? n.trim() : null;
+  if (!name) {
+    const { name: nm } = await inquirer.prompt([
+      {
+        name: 'name',
+        type: 'input',
+        message: 'Please enter the platform name'
+      }
+    ]);
+    name = nm;
+  }
+  if(!name){
+    warn('The name of platform should not be null');
+    return;
+  }
+  const copied = await copyTemplate(name);
+  const config = readPlatConfig(name);
+  let formats = config ? config.jsFormats : null;
+  if (!copied) {
+    if (!formats) {
+      const { formats: f } = await inquirer.prompt([
+        {
+          name: 'formats',
+          type: 'checkbox',
+          message: 'Choice code formats:',
+          choices: ['ts', 'tsx', 'js', 'jsx']
+        }
+      ]);
+      formats = f;
+    }
+    createPlat(name, formats||['js'],rootConfig);
+    const fileEnd = selectJsFormat(formats!);
+    if (fileEnd.startsWith('ts')) {
+      copyResource(path.join(platsPath, name));
+    }
+  }
+  writePlatConfig(name, formats || ['js']);
+  await execa('prettier', ['--write', path.join(platsPath, name)], {
+    cwd: rootPath
+  });
+  const { git } = rootConfig;
+  if (git) {
+    await execa('git', ['add', path.join(platsPath, name)], {
+      cwd: rootPath
+    });
+  }
+  await refreshAction();
+  success(`create platform "${name}" success`);
 }
 
 function commandPlat(program: Command) {
@@ -124,50 +255,7 @@ function commandPlat(program: Command) {
     .command('plat')
     .description('Create a platform, and add into `plats` folder')
     .option('-n, --name <char>', 'Define the platform name you want to create.')
-    .action(async ({ name: n }) => {
-      let name = n && n.trim() ? n.trim() : null;
-      if (!name) {
-        const { name: nm } = await inquirer.prompt([
-          {
-            name: 'name',
-            type: 'input',
-            message: 'Please enter the platform name'
-          }
-        ]);
-        name = nm;
-      }
-
-      const config = readPlatConfig(name);
-      let formats = config ? config.jsFormats : null;
-      if (!formats) {
-        const { formats: f } = await inquirer.prompt([
-          {
-            name: 'formats',
-            type: 'checkbox',
-            message: 'Choice code formats:',
-            choices: ['ts', 'tsx', 'js', 'jsx']
-          }
-        ]);
-        formats = f;
-      }
-      createPlat(name, formats!);
-      writePlatConfig(name, formats!);
-      const { git } = readConfig() || {};
-      const fileEnd = selectJsFormat(formats!);
-      if (fileEnd.startsWith('ts')) {
-        copyResource(path.join(platsPath, name));
-      }
-      await execa('prettier', ['--write', path.join(platsPath, name)], {
-        cwd: rootPath
-      });
-      if (git) {
-        await execa('git', ['add', path.join(platsPath, name)], {
-          cwd: rootPath
-        });
-      }
-      await refreshAction();
-      success(`create platform "${name}" success`);
-    });
+    .action(platAction);
 }
 
-export { commandPlat };
+export { commandPlat,platAction };

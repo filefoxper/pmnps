@@ -1,25 +1,75 @@
 import { program } from 'commander';
-import { commandInitial } from './commands/initial';
-import { commandRefresh } from './commands/refresh';
-import { commandPack } from './commands/pack';
-import { commandPlat } from './commands/plat';
-import { commandStart } from './commands/start';
-import { commandBuild } from './commands/build';
+import { commandInitial, initialAction } from './commands/initial';
+import {
+  commandRefresh,
+  fullRefreshAction,
+  refreshAction
+} from './commands/refresh';
+import { commandPack, packAction } from './commands/pack';
+import { commandPlat, platAction } from './commands/plat';
+import { commandStart, startAction } from './commands/start';
+import { buildAction, commandBuild } from './commands/build';
 import execa from 'execa';
-import { error } from './info';
+import { desc, error } from './info';
+import { commandTemplate, templateAction } from './commands/template';
+import { readConfig } from './file';
+import inquirer from 'inquirer';
+import { commandConfig, configAction } from './commands/config';
+
+const actions: Record<string, (...args: any[]) => Promise<any>> = {
+  start: startAction,
+  refresh: fullRefreshAction,
+  pack: packAction,
+  plat: platAction,
+  template: templateAction,
+  build: buildAction,
+  config: configAction
+};
 
 function defineCommander() {
   program
-    .name('mnp')
+    .name('pmnps')
     .description('This is a tool to build monorepo platforms.')
-    .version('1.0.2');
+    .version('1.1.0')
+    .action(async () => {
+      const rootConfig = readConfig(true);
+      if (!rootConfig) {
+        await initialAction();
+        return;
+      }
+      const { action } = await inquirer.prompt([
+        {
+          name: 'action',
+          type: 'list',
+          message: 'Choice the action you want to do:',
+          choices: [
+            'start',
+            'refresh',
+            'config',
+            'pack',
+            'plat',
+            'template',
+            'build'
+          ],
+          default: 'start'
+        }
+      ]);
+      if (!action) {
+        desc('You have choice no action to run.');
+        return;
+      }
+      const actionCall = actions[action];
+      if (!actionCall) {
+        error('There is an action choice bug happen in pmnps.');
+        return;
+      }
+      await actionCall();
+    });
 }
 
-function npmSupport() {
-  const { stdout } = execa.sync('npm', ['-v']);
-  const validVersions = [7, 7, 0];
-  const currentVersions = stdout.split('.').map(d => Number(d));
-  const result = validVersions.reduce((r: number, v: number, i: number) => {
+function versionCheck(current: string, limit: [number, number, number]) {
+  const currentVersions = current.split('.').map(d => Number(d));
+  const result = limit.reduce((r: number, v: number, i: number) => {
     const c = currentVersions[i];
     if (r !== 0) {
       return r;
@@ -35,8 +85,30 @@ function npmSupport() {
   return result >= 0;
 }
 
+function nodeSupport() {
+  const { stdout } = execa.sync('node', ['-v']);
+  const validVersions = [16, 7, 0] as [number, number, number];
+  return versionCheck(
+    stdout.startsWith('v') ? stdout.slice(1) : stdout,
+    validVersions
+  );
+}
+
+function npmSupport() {
+  const { stdout } = execa.sync('npm', ['-v']);
+  const validVersions = [7, 7, 0] as [number, number, number];
+  return versionCheck(
+    stdout.startsWith('v') ? stdout.slice(1) : stdout,
+    validVersions
+  );
+}
+
 function startup() {
   defineCommander();
+  if (!nodeSupport()) {
+    error('The nodejs version should >= 16.7.0');
+    return;
+  }
   if (!npmSupport()) {
     error('The npm version should >= 7.7.0');
     return;
@@ -47,6 +119,8 @@ function startup() {
   commandPlat(program);
   commandStart(program);
   commandBuild(program);
+  commandTemplate(program);
+  commandConfig(program);
   program.parse();
 }
 

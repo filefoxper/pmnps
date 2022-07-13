@@ -77,14 +77,16 @@ async function refreshAction() {
   });
 }
 
+async function fullRefreshAction(){
+  await refreshAction();
+  success('refresh success');
+}
+
 function commandRefresh(program: Command) {
   program
     .command('refresh')
     .description('Refresh `packages & plats` to link the unlink packages.')
-    .action(async () => {
-      await refreshAction();
-      success('refresh success');
-    });
+    .action(fullRefreshAction);
 }
 
-export { commandRefresh, refreshAction };
+export { commandRefresh, refreshAction, fullRefreshAction };

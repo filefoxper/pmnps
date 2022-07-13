@@ -7,7 +7,7 @@ import {
   rootPath,
   writeRootPackageJson
 } from '../file';
-import {desc, error, log, success, warn} from '../info';
+import { desc, error, log, success, warn } from '../info';
 import path from 'path';
 import fs from 'fs';
 
@@ -62,8 +62,8 @@ async function combineDeps() {
     const { dependencies, devDependencies } = packageJson;
     return {
       ...data,
-      dependencies: { ...data.dependencies, ...dependencies },
-      devDependencies: { ...data.devDependencies, ...devDependencies }
+      dependencies: { ...dependencies, ...data.dependencies },
+      devDependencies: { ...devDependencies, ...data.devDependencies }
     };
   }, root as Record<string, any>);
   const list: string[] = packs
@@ -77,8 +77,8 @@ async function combineDeps() {
     const { dependencies, devDependencies } = current;
     return {
       ...data,
-      dependencies: { ...data.dependencies, ...dependencies },
-      devDependencies: { ...data.devDependencies, ...devDependencies }
+      dependencies: { ...dependencies, ...data.dependencies },
+      devDependencies: { ...devDependencies, ...data.devDependencies }
     };
   }, packageJson);
   const validPackageJson = removeDepPacks(finalPackageJson, list);

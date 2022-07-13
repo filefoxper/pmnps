@@ -17,7 +17,7 @@ import { basicDevDependencies, selectJsFormat } from '../resource';
 import fs from 'fs';
 import { Config, PackConfig, TemplateConfig } from '../type';
 import { refreshAction } from './refresh';
-import {success, warn} from '../info';
+import {log, success, warn} from '../info';
 
 const configName = 'pmnp.pack.json';
 
@@ -192,6 +192,14 @@ function createPack(
   createTsConfig(name, fileEnd);
 }
 
+async function gitAddition(name: string, git?: boolean): Promise<void> {
+  if (git) {
+    await execa('git', ['add', path.join(packsPath, name)], {
+      cwd: rootPath
+    });
+  }
+}
+
 async function packAction({name:n}:{name?:string}|undefined = {}){
   const rootConfig = readConfig();
   if (!rootConfig) {
@@ -227,22 +235,23 @@ async function packAction({name:n}:{name?:string}|undefined = {}){
       ]);
       formats = f;
     }
+    log('config package...');
     createPack(name, formats!);
     const fileEnd = selectJsFormat(formats!);
     if (fileEnd.startsWith('ts')) {
       copyResource(path.join(packsPath, name));
     }
+  }else{
+    log('config package...');
   }
-  writePackConfig(name, formats||['js']);
-  await execa('prettier', ['--write', path.join(packsPath, name)], {
-    cwd: rootPath
-  });
   const { git } = rootConfig;
-  if (git) {
-    await execa('git', ['add', path.join(packsPath, name)], {
+  writePackConfig(name, formats||['js']);
+  await Promise.all([
+    execa('prettier', ['--write', path.join(packsPath, name)], {
       cwd: rootPath
-    });
-  }
+    }),
+    gitAddition(name,git)
+  ]);
   await refreshAction();
   success(`create package "${name}" success`);
 }

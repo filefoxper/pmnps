@@ -51,21 +51,14 @@ function generateNewDevDep(packageJson: Record<string, any> | undefined) {
     return basicDevDependencies;
   }
   const sourceDev = packageJson.devDependencies;
-  const e = Object.entries(basicDevDependencies);
-  const entries = e.map(([k, v]) =>
-    sourceDev[k] ? [k, sourceDev[k]] : [k, v]
-  );
-  return Object.fromEntries(entries);
+  return {...basicDevDependencies,...sourceDev};
 }
 
 function writeRootPackageJson(workspace: string) {
   const preAddition = {
     version: '1.0.0',
     description: 'project of monorepo platforms',
-    dependencies: {},
-    devDependencies: {
-      ...basicDevDependencies
-    }
+    dependencies: {}
   };
   const addition = {
     name: workspace,

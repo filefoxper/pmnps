@@ -13,6 +13,7 @@ import { desc, error, info, success, warn } from '../info';
 import path from 'path';
 import fs from 'fs';
 import inquirer from 'inquirer';
+import {refreshAction} from "./refresh";
 
 const platsPath = path.join(rootPath, 'plats');
 
@@ -41,7 +42,7 @@ type PlatPackage = {
   pmnps?: { platDependencies: string[] };
   deps: PlatPackage[];
   dets: PlatPackage[];
-  level:number
+  level: number;
 };
 
 function analyzePlatDependencies(packages: PlatPackage[]) {
@@ -75,11 +76,14 @@ function computeTasks(packs: PlatPackage[]): PlatPackage[][] {
   return [currents, ...deps];
 }
 
-function computeTaskDeps(deps: PlatPackage[] = [],level:number=0): PlatPackage[] {
+function computeTaskDeps(
+  deps: PlatPackage[] = [],
+  level: number = 0
+): PlatPackage[] {
   const result = deps.flatMap(pack => {
     pack.level = level;
     if (pack.deps && pack.deps.length) {
-      const currentDeps = computeTaskDeps(pack.deps,level+1);
+      const currentDeps = computeTaskDeps(pack.deps, level + 1);
       return [...currentDeps, pack];
     }
     return pack;
@@ -87,7 +91,10 @@ function computeTaskDeps(deps: PlatPackage[] = [],level:number=0): PlatPackage[]
   return [...new Set(result)];
 }
 
-async function resortForms(formRange: string[], form?: string):Promise<Array<PlatPackage[]>> {
+async function resortForms(
+  formRange: string[],
+  form?: string
+): Promise<Array<PlatPackage[]>> {
   const fetches = formRange.map(n =>
     readPackageJsonAsync(path.join(platsPath, n, 'package.json'))
   );
@@ -103,20 +110,23 @@ async function resortForms(formRange: string[], form?: string):Promise<Array<Pla
     return [];
   }
   const deps = computeTaskDeps([found]);
-  const levels:Array<PlatPackage[]> = [];
-  deps.forEach((dep)=>{
+  const levels: Array<PlatPackage[]> = [];
+  deps.forEach(dep => {
     const index = dep.level;
-    levels[index]=Array.isArray(levels[index])?levels[index]:[];
+    levels[index] = Array.isArray(levels[index]) ? levels[index] : [];
     levels[index].push(dep);
   });
   return levels.reverse();
 }
 
-async function batchBuild(packGroups:PlatPackage[][],mode?:string):Promise<void>{
-  if(!packGroups.length){
+async function batchBuild(
+  packGroups: PlatPackage[][],
+  mode?: string
+): Promise<void> {
+  if (!packGroups.length) {
     return;
   }
-  const [packs,...rest] = packGroups;
+  const [packs, ...rest] = packGroups;
   const runners = packs.map(pf => {
     return execa('npm', ['run', mode ? `build-${mode}` : 'build'], {
       cwd: path.join(platsPath, pf.name)
@@ -125,7 +135,7 @@ async function batchBuild(packGroups:PlatPackage[][],mode?:string):Promise<void>
   const results = await Promise.all(runners);
   results.forEach((r, i) => {
     const pf = packs[i];
-    const {name} = pf;
+    const { name } = pf;
     const { stdout, stderr } = r;
     info(`==================== ${name} ====================`);
     if (stderr) {
@@ -134,16 +144,17 @@ async function batchBuild(packGroups:PlatPackage[][],mode?:string):Promise<void>
       desc(stdout);
     }
   });
-  if(!rest.length){
+  if (!rest.length) {
     return;
   }
-  return batchBuild(rest);
+  return batchBuild(rest,mode);
 }
 
 async function buildAction({
   plat: startPlat,
-  mode
-}: { plat?: string; mode?: string } | undefined = {}) {
+  mode,
+  install
+}: { plat?: string; mode?: string; install?: boolean } | undefined = {}) {
   const rootConfig = readConfig();
   if (!rootConfig) {
     return;
@@ -170,8 +181,11 @@ async function buildAction({
       ? `start building platform: ${platform}`
       : `start building platforms`
   );
-  const pfs = await resortForms(forms, platform||undefined);
-  await batchBuild(pfs);
+  if (install){
+    await refreshAction();
+  }
+  const pfs = await resortForms(forms, platform || undefined);
+  await batchBuild(pfs,mode);
 }
 
 function commandBuild(program: Command) {
@@ -183,6 +197,7 @@ function commandBuild(program: Command) {
       '-m, --mode <char>',
       'Use a customized build mode in package.json, like `scripts["build-${mode}"]`'
     )
+    .option('-i, --install', 'Install before build')
     .action(buildAction);
 }
 

@@ -7,7 +7,7 @@ import {
   rootPath,
   writeRootPackageJson
 } from '../file';
-import { desc, error, log, success, warn } from '../info';
+import { desc, error, info, log, success, warn } from '../info';
 import path from 'path';
 import fs from 'fs';
 
@@ -48,6 +48,12 @@ function packageDetect(dirPath: string): Promise<
   return Promise.all(fetches);
 }
 
+function isOwnRootPlat(json: Record<string, any>): boolean {
+  const { pmnps = {} } = json;
+  const { ownRoot } = pmnps;
+  return !!ownRoot;
+}
+
 async function combineDeps() {
   const [root, packs, plats] = await Promise.all([
     readPackageJsonAsync(path.join(projectPath, 'package.json')),
@@ -71,7 +77,7 @@ async function combineDeps() {
     .filter((d): d is string => d);
   const finalPackageJson = plats.reduce((data, pack) => {
     const current = pack.packageJson;
-    if (!current) {
+    if (!current || isOwnRootPlat(current)) {
       return data;
     }
     const { dependencies, devDependencies } = current;
@@ -86,11 +92,53 @@ async function combineDeps() {
     path.join(projectPath, 'package.json'),
     JSON.stringify(validPackageJson)
   );
+  return plats;
 }
 
-async function refreshAction() {
+async function installOwnRootPlats(
+  plats: {
+    packageJson: Record<string, any> | undefined;
+    dirName: string;
+    dirPath: string;
+  }[]
+): Promise<void> {
+  if (!plats.length) {
+    return;
+  }
+  const [current, ...rest] = plats;
+  const { dirPath, packageJson } = current;
+  info(
+    `==================== install own root platform ${
+      (packageJson || { name: 'unknown' }).name
+    } dependencies ====================`
+  );
+  const subprocess = execa('npm', ['install'], {
+    cwd: dirPath
+  });
+  // @ts-ignore
+  subprocess.stderr.pipe(process.stderr);
+  // @ts-ignore
+  subprocess.stdout.pipe(process.stdout);
+  await subprocess;
+  if (!rest.length) {
+    return;
+  }
+  return installOwnRootPlats(rest);
+}
+
+async function refreshAction(isInitial?: boolean) {
   log('detect and install dependencies...');
-  await combineDeps();
+  const plats = await combineDeps();
+  const ownRoots = plats.filter(({ packageJson }) => {
+    if (!packageJson) {
+      return false;
+    }
+    const { pmnps } = packageJson;
+    return pmnps && pmnps.ownRoot;
+  });
+  info(
+    '==================== install project root dependencies ===================='
+  );
   const subprocess = execa('npm', ['install'], {
     cwd: rootPath
   });
@@ -99,6 +147,10 @@ async function refreshAction() {
   // @ts-ignore
   subprocess.stdout.pipe(process.stdout);
   await subprocess;
+  await installOwnRootPlats(ownRoots);
+  if (!isInitial) {
+    return;
+  }
   await execa('prettier', ['--write', path.join(rootPath, 'package.json')], {
     cwd: projectPath
   });

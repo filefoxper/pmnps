@@ -161,6 +161,12 @@ $ pmnps build -p <platform>
 $ pmnps build -m <mode>
 ```
 
+如果想要在 build 之前进行安装依赖项操作，可以使用 `-i` 选项。
+
+```
+$ pmnps build -i
+```
+
 ### 使用 config 命令
 
 `config` 命令用于配置部分 pmnp 设置，如：启用 git、重命名 workspace、设置 build 模式。build 模式，可以在 build 命令中通过选项 `-m <mode>` 来使用。当我们使用 `plat` 或 `pack` 命令新建项目包时，`packaghe.json > scripts` 中会自动加入所有的 build 模式脚本，`"build-<mode>":"......"`
@@ -177,7 +183,7 @@ $ pmnps config
 
 我们可以通过添加 "pmnps" 属性来使用 pmnps 的增强功能。
 
-### platform 配置
+### platform 配置 platDependencies
 
 通过使用 `pmnps.platDependencies` 配置可以描述出平台项目之间的 build 依赖关系，在我们运行 `build` 命令时， pmnps 会按照我们的描述逐一编译。
 
@@ -237,3 +243,23 @@ platC -> package.json
 ```
 
 通过运行 `build` 命令，我们可以观察到 `build platC -> build platB -> build platA` 这样的编译顺序。
+
+### platform 配置 ownRoot
+
+通过在平台项目的 package.json 文件中配置 `pmnps.ownRoot` 可以让该平台使用自己的 `node_modules` 依赖目录。
+
+```
+{
+  "private": true,
+  "name": "platB",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "...start",
+    "build": "... build",
+    "build-inside": ".... build inside mode" 
+  },
+  "pmnps": {
+    "ownRoot": true
+  }
+}
+```

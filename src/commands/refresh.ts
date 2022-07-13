@@ -2,11 +2,12 @@ import { Command } from 'commander';
 import execa from 'execa';
 import {
   readPackageJson,
+  readPackageJsonAsync,
   readRootPackageJson,
   rootPath,
   writeRootPackageJson
 } from '../file';
-import { desc, error, success, warn } from '../info';
+import {desc, error, log, success, warn} from '../info';
 import path from 'path';
 import fs from 'fs';
 
@@ -27,24 +28,49 @@ function removeDepPacks(
   return { ...packageJson, dependencies: newDep };
 }
 
-function combineDeps() {
-  const root = readRootPackageJson();
-  const list = fs.readdirSync(packsPath);
-  const packageJson = list.reduce((data, name) => {
-    const current = readPackageJson(path.join(packsPath, name, 'package.json'));
-    if (!current) {
+function packageDetect(dirPath: string): Promise<
+  {
+    packageJson: Record<string, any> | undefined;
+    dirName: string;
+    dirPath: string;
+  }[]
+> {
+  const list = fs.readdirSync(dirPath);
+  const fetches = list.map(dirName =>
+    (async function pack() {
+      const packageDirPath = path.join(dirPath, dirName);
+      const packageJson = await readPackageJsonAsync(
+        path.join(packageDirPath, 'package.json')
+      );
+      return { packageJson, dirName, dirPath: packageDirPath };
+    })()
+  );
+  return Promise.all(fetches);
+}
+
+async function combineDeps() {
+  const [root, packs, plats] = await Promise.all([
+    readPackageJsonAsync(path.join(projectPath, 'package.json')),
+    packageDetect(packsPath),
+    packageDetect(platsPath)
+  ]);
+  const packageJson = packs.reduce((data: Record<string, any>, pack) => {
+    const { packageJson } = pack;
+    if (!packageJson) {
       return data;
     }
-    const { dependencies, devDependencies } = current;
+    const { dependencies, devDependencies } = packageJson;
     return {
       ...data,
       dependencies: { ...data.dependencies, ...dependencies },
       devDependencies: { ...data.devDependencies, ...devDependencies }
     };
-  }, root);
-  const plats = fs.readdirSync(platsPath);
-  const finalPackageJson = plats.reduce((data, name) => {
-    const current = readPackageJson(path.join(platsPath, name, 'package.json'));
+  }, root as Record<string, any>);
+  const list: string[] = packs
+    .map(({ packageJson }) => (packageJson ? packageJson.name : null))
+    .filter((d): d is string => d);
+  const finalPackageJson = plats.reduce((data, pack) => {
+    const current = pack.packageJson;
     if (!current) {
       return data;
     }
@@ -63,21 +89,22 @@ function combineDeps() {
 }
 
 async function refreshAction() {
-  combineDeps();
-  const { stdout, stderr } = await execa('npm', ['install'], {
+  log('detect and install dependencies...');
+  await combineDeps();
+  const subprocess = execa('npm', ['install'], {
     cwd: rootPath
   });
-  if (stderr) {
-    warn(stderr);
-  } else {
-    desc(stdout);
-  }
+  // @ts-ignore
+  subprocess.stderr.pipe(process.stderr);
+  // @ts-ignore
+  subprocess.stdout.pipe(process.stdout);
+  await subprocess;
   await execa('prettier', ['--write', path.join(rootPath, 'package.json')], {
     cwd: projectPath
   });
 }
 
-async function fullRefreshAction(){
+async function fullRefreshAction() {
   await refreshAction();
   success('refresh success');
 }

@@ -17,13 +17,17 @@ import { basicDevDependencies, selectJsFormat } from '../resource';
 import fs from 'fs';
 import { Config, PackConfig, TemplateConfig } from '../type';
 import { refreshAction } from './refresh';
-import {error, success, warn} from '../info';
+import { error, log, success, warn } from '../info';
 
 const configName = 'pmnp.plat.json';
 
 const platsPath = path.join(rootPath, 'plats');
 
-function createPlatPackageJson(name: string, fileEnd: string,rootConfig:Config) {
+function createPlatPackageJson(
+  name: string,
+  fileEnd: string,
+  rootConfig: Config
+) {
   const isTs = fileEnd.startsWith('ts');
   const isReact = fileEnd.endsWith('x');
   const packageJsonPath = path.join(platsPath, name, 'package.json');
@@ -34,8 +38,11 @@ function createPlatPackageJson(name: string, fileEnd: string,rootConfig:Config) 
         'react-dom': '16.14.0'
       }
     : {};
-  const {buildModes=[]} = rootConfig;
-  const modeEntries = buildModes.map((mode:string)=>[`build-${mode}`,'echo Please edit a build script.']);
+  const { buildModes = [] } = rootConfig;
+  const modeEntries = buildModes.map((mode: string) => [
+    `build-${mode}`,
+    'echo Please edit a build script.'
+  ]);
   const buildModeScripts = Object.fromEntries(modeEntries);
   const json = {
     name,
@@ -137,18 +144,16 @@ function readTemplates(): string[] {
   });
 }
 
-async function copyProject(name:string,tempName:string){
+async function copyProject(name: string, tempName: string) {
   await copyFolder(
-      path.join(rootPath, 'templates', tempName),
-      path.join(platsPath, name)
+    path.join(rootPath, 'templates', tempName),
+    path.join(platsPath, name)
   );
-  writePackageJson(path.join(platsPath, name,'package.json'),{name});
-  fs.unlinkSync(path.join(platsPath, name,'pmnps.template.json'));
+  writePackageJson(path.join(platsPath, name, 'package.json'), { name });
+  fs.unlinkSync(path.join(platsPath, name, 'pmnps.template.json'));
 }
 
-async function copyTemplate(
-  name: string,
-): Promise<boolean> {
+async function copyTemplate(name: string): Promise<boolean> {
   let useTemplate = false;
   const templates = readTemplates();
   if (templates.length) {
@@ -164,7 +169,7 @@ async function copyTemplate(
   if (useTemplate && templates.length) {
     if (templates.length === 1) {
       const [tempName] = templates;
-      await copyProject(name,tempName);
+      await copyProject(name, tempName);
       return true;
     }
     const { temp } = await inquirer.prompt([
@@ -176,13 +181,17 @@ async function copyTemplate(
         default: templates[0]
       }
     ]);
-    await copyProject(name,temp);
+    await copyProject(name, temp);
     return true;
   }
   return false;
 }
 
-function createPlat(name: string, formats: ('ts' | 'tsx' | 'js' | 'jsx')[],rootConfig:Config) {
+function createPlat(
+  name: string,
+  formats: ('ts' | 'tsx' | 'js' | 'jsx')[],
+  rootConfig: Config
+) {
   mkdirIfNotExist(path.join(platsPath, name));
   mkdirIfNotExist(path.join(platsPath, name, 'src'));
   const fileEnd = selectJsFormat(formats);
@@ -191,11 +200,19 @@ function createPlat(name: string, formats: ('ts' | 'tsx' | 'js' | 'jsx')[],rootC
     `index.${fileEnd}`,
     ['ts', 'tsx', 'js', 'jsx']
   );
-  createPlatPackageJson(name, fileEnd,rootConfig);
+  createPlatPackageJson(name, fileEnd, rootConfig);
   createTsConfig(name, fileEnd);
 }
 
-async function platAction({name:n}:{name?:string}|undefined = {}){
+async function gitAddition(name: string, git?: boolean): Promise<void> {
+  if (git) {
+    await execa('git', ['add', path.join(platsPath, name)], {
+      cwd: rootPath
+    });
+  }
+}
+
+async function platAction({ name: n }: { name?: string } | undefined = {}) {
   const rootConfig = readConfig();
   if (!rootConfig) {
     return;
@@ -211,7 +228,7 @@ async function platAction({name:n}:{name?:string}|undefined = {}){
     ]);
     name = nm;
   }
-  if(!name){
+  if (!name) {
     warn('The name of platform should not be null');
     return;
   }
@@ -230,22 +247,23 @@ async function platAction({name:n}:{name?:string}|undefined = {}){
       ]);
       formats = f;
     }
-    createPlat(name, formats||['js'],rootConfig);
+    log('config plat...');
+    createPlat(name, formats || ['js'], rootConfig);
     const fileEnd = selectJsFormat(formats!);
     if (fileEnd.startsWith('ts')) {
       copyResource(path.join(platsPath, name));
     }
+  }else{
+    log('config plat...');
   }
   writePlatConfig(name, formats || ['js']);
-  await execa('prettier', ['--write', path.join(platsPath, name)], {
-    cwd: rootPath
-  });
   const { git } = rootConfig;
-  if (git) {
-    await execa('git', ['add', path.join(platsPath, name)], {
+  await Promise.all([
+    execa('prettier', ['--write', path.join(platsPath, name)], {
       cwd: rootPath
-    });
-  }
+    }),
+    gitAddition(name, git)
+  ]);
   await refreshAction();
   success(`create platform "${name}" success`);
 }
@@ -258,4 +276,4 @@ function commandPlat(program: Command) {
     .action(platAction);
 }
 
-export { commandPlat,platAction };
+export { commandPlat, platAction };

@@ -8,6 +8,10 @@ function info(message: string) {
   console.log(chalk.black.bold(message));
 }
 
+function log(message:string){
+  console.log(chalk.blue(message));
+}
+
 function success(message: string) {
   console.log(chalk.green(message));
 }
@@ -20,4 +24,4 @@ function warn(message: string) {
   console.log(chalk.magenta(message));
 }
 
-export { error, info, success, desc, warn };
+export { error, info, success, desc, warn,log };

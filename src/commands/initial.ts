@@ -68,7 +68,7 @@ async function initialAction(){
       );
       writeConfig({ git: true });
     }
-    await refreshAction();
+    await refreshAction(true);
     success('initial success!');
   } catch (e) {
     error('initial failed!');

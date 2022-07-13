@@ -165,6 +165,12 @@ If you want to build with a mode you set with command `config`, you can use opti
 $ pmnps build -p <platform> -m <mode>
 ```
 
+If you want to install dependencies before build, you can use option param `-i`.
+
+```
+$ pmnps build -p <platform> -m <mode> -i
+```
+
 ### use config command
 
 The `config` command allows you to do more configs. You can open `git usage`, `rename workspace` and add `build mode` for your project. The `build mode` is a string word which will be added into your `package.json > scripts` like `scripts.build-<mode>`, when you use command `build` with option `-m <mode>`, it runs `npm run build-<mode>` script.
@@ -185,7 +191,7 @@ $ pmnps template
 
 Now, you can add `pmnps` property into your package.json in platforms or packages.
 
-### platform config
+### platform config platDependencies
 
 Add `pmnps.platDependencies` config to describe the build dependencies in platforms.
 
@@ -245,3 +251,23 @@ platC -> package.json
 ```
 
 So, when use command `build`, it will follow the `platDependencies` build one by one, `build platC -> build platB -> build platA`.
+
+### platform config ownRoot
+
+Add `pmnps.ownRoot` config to describe a platform which installs `node_modules` in own root folder.
+
+```
+{
+  "private": true,
+  "name": "platB",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "...start",
+    "build": "... build",
+    "build-inside": ".... build inside mode" 
+  },
+  "pmnps": {
+    "ownRoot": true
+  }
+}
+```

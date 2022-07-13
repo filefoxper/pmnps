@@ -13,7 +13,7 @@ import { desc, error, info, success, warn } from '../info';
 import path from 'path';
 import fs from 'fs';
 import inquirer from 'inquirer';
-import {refreshAction} from "./refresh";
+import {installAction, packageDetect} from "./refresh";
 
 const platsPath = path.join(rootPath, 'plats');
 
@@ -182,7 +182,8 @@ async function buildAction({
       : `start building platforms`
   );
   if (install){
-    await refreshAction();
+    const plats = await packageDetect(platsPath);
+    await installAction(plats);
   }
   const pfs = await resortForms(forms, platform || undefined);
   await batchBuild(pfs,mode);

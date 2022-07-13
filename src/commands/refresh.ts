@@ -126,9 +126,11 @@ async function installOwnRootPlats(
   return installOwnRootPlats(rest);
 }
 
-async function refreshAction(isInitial?: boolean) {
-  log('detect and install dependencies...');
-  const plats = await combineDeps();
+async function installAction(plats:{
+  packageJson: Record<string, any> | undefined;
+  dirName: string;
+  dirPath: string;
+}[]){
   const ownRoots = plats.filter(({ packageJson }) => {
     if (!packageJson) {
       return false;
@@ -137,7 +139,7 @@ async function refreshAction(isInitial?: boolean) {
     return pmnps && pmnps.ownRoot;
   });
   info(
-    '==================== install project root dependencies ===================='
+      '==================== install project root dependencies ===================='
   );
   const subprocess = execa('npm', ['install'], {
     cwd: rootPath
@@ -148,9 +150,12 @@ async function refreshAction(isInitial?: boolean) {
   subprocess.stdout.pipe(process.stdout);
   await subprocess;
   await installOwnRootPlats(ownRoots);
-  if (!isInitial) {
-    return;
-  }
+}
+
+async function refreshAction() {
+  log('detect and install dependencies...');
+  const plats = await combineDeps();
+  await installAction(plats);
   await execa('prettier', ['--write', path.join(rootPath, 'package.json')], {
     cwd: projectPath
   });
@@ -168,4 +173,4 @@ function commandRefresh(program: Command) {
     .action(fullRefreshAction);
 }
 
-export { commandRefresh, refreshAction, fullRefreshAction };
+export { commandRefresh, refreshAction, installAction, packageDetect, fullRefreshAction };

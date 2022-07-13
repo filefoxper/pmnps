@@ -17,7 +17,7 @@ import { basicDevDependencies, selectJsFormat } from '../resource';
 import fs from 'fs';
 import { Config, PackConfig, TemplateConfig } from '../type';
 import { refreshAction } from './refresh';
-import {log, success, warn} from '../info';
+import { log, success, warn } from '../info';
 
 const configName = 'pmnp.pack.json';
 
@@ -132,16 +132,16 @@ function readTemplates(): string[] {
   });
 }
 
-async function copyProject(name:string,tempName:string){
+async function copyProject(name: string, tempName: string) {
   await copyFolder(
-      path.join(rootPath, 'templates', tempName),
-      path.join(packsPath, name)
+    path.join(rootPath, 'templates', tempName),
+    path.join(packsPath, name)
   );
-  writePackageJson(path.join(packsPath, name,'package.json'),{name});
-  fs.unlinkSync(path.join(packsPath, name,'pmnps.template.json'));
+  writePackageJson(path.join(packsPath, name, 'package.json'), { name });
+  fs.unlinkSync(path.join(packsPath, name, 'pmnps.template.json'));
 }
 
-async function copyTemplate(name: string):Promise<boolean>{
+async function copyTemplate(name: string): Promise<boolean> {
   let useTemplate = false;
   const templates = readTemplates();
   if (templates.length) {
@@ -157,7 +157,7 @@ async function copyTemplate(name: string):Promise<boolean>{
   if (useTemplate && templates.length) {
     if (templates.length === 1) {
       const [tempName] = templates;
-      await copyProject(name,tempName);
+      await copyProject(name, tempName);
       return true;
     }
     const { temp } = await inquirer.prompt([
@@ -169,16 +169,13 @@ async function copyTemplate(name: string):Promise<boolean>{
         default: templates[0]
       }
     ]);
-    await copyProject(name,temp);
+    await copyProject(name, temp);
     return true;
   }
   return false;
 }
 
-function createPack(
-  name: string,
-  formats: ('ts' | 'tsx' | 'js' | 'jsx')[]
-) {
+function createPack(name: string, formats: ('ts' | 'tsx' | 'js' | 'jsx')[]) {
   mkdirIfNotExist(path.join(packsPath, name));
   mkdirIfNotExist(path.join(packsPath, name, 'src'));
   const fileEnd = selectJsFormat(formats);
@@ -192,7 +189,19 @@ function createPack(
   createTsConfig(name, fileEnd);
 }
 
-async function gitAddition(name: string, git?: boolean): Promise<void> {
+async function prettierProject(name: string, isNew: boolean) {
+  if (isNew) {
+    await execa('prettier', ['--write', path.join(packsPath, name)], {
+      cwd: rootPath
+    });
+  }
+}
+
+async function gitAddition(
+  name: string,
+  isNew: boolean,
+  git?: boolean
+): Promise<void> {
   if (git) {
     await execa('git', ['add', path.join(packsPath, name)], {
       cwd: rootPath
@@ -200,7 +209,7 @@ async function gitAddition(name: string, git?: boolean): Promise<void> {
   }
 }
 
-async function packAction({name:n}:{name?:string}|undefined = {}){
+async function packAction({ name: n }: { name?: string } | undefined = {}) {
   const rootConfig = readConfig();
   if (!rootConfig) {
     return;
@@ -216,14 +225,14 @@ async function packAction({name:n}:{name?:string}|undefined = {}){
     ]);
     name = nm;
   }
-  if(!name){
+  if (!name) {
     warn('The name of package should not be null');
     return;
   }
   const copied = await copyTemplate(name);
   const config = readPackConfig(name);
   let formats = config ? config.jsFormats : null;
-  if(!copied){
+  if (!copied) {
     if (!formats) {
       const { formats: f } = await inquirer.prompt([
         {
@@ -241,16 +250,15 @@ async function packAction({name:n}:{name?:string}|undefined = {}){
     if (fileEnd.startsWith('ts')) {
       copyResource(path.join(packsPath, name));
     }
-  }else{
+  } else {
     log('config package...');
   }
   const { git } = rootConfig;
-  writePackConfig(name, formats||['js']);
+  writePackConfig(name, formats || ['js']);
+  const isNew = !config;
   await Promise.all([
-    execa('prettier', ['--write', path.join(packsPath, name)], {
-      cwd: rootPath
-    }),
-    gitAddition(name,git)
+    prettierProject(name, isNew),
+    gitAddition(name, isNew, git)
   ]);
   await refreshAction();
   success(`create package "${name}" success`);
@@ -264,4 +272,4 @@ function commandPack(program: Command) {
     .action(packAction);
 }
 
-export { commandPack,packAction };
+export { commandPack, packAction };

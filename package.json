@@ -1,10 +1,10 @@
 {
   "name": "pmnps",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "main": "bin/pmnps.js",
   "typings": "index.d.ts",
   "author": "Jimmy.Harding",
-  "description": "the purpose of this project is using a class to replace a reducer",
+  "description": "This is a monorepo manage tool using `npm:workspaces` tech",
   "scripts": {
     "start": "ts-node ./src/test.index.ts",
     "clear": "rm -rf ./bin",
@@ -75,5 +75,8 @@
     "rewire": "5.0.0",
     "typescript": "4.2.2",
     "ts-node": "^10.8.2"
+  },
+  "engines": {
+    "node": ">=16.7.0"
   }
 }

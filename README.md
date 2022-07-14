@@ -337,3 +337,9 @@ $ pmnps build -p "?pb= -i"
   }
 }
 ```
+
+Use `build -p`, we can provide params for `before` or `after` scripts.
+
+```
+$ pmnps build -p "?platB.before= -i -e <word>"
+```

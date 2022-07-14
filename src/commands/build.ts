@@ -203,7 +203,7 @@ function commandBuild(program: Command) {
     .option('-n, --name <char>', 'Enter the platform name for building')
     .option(
       '-p, --param <char>',
-      'Enter the platform building params like `"?a&b=param1"`  or `"??a&b=param1"`, it trans to `-a -b param1` or `--a --b param1`'
+      'Enter the platform building params'
     )
     .option(
       '-m, --mode <char>',

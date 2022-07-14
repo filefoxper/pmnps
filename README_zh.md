@@ -331,3 +331,9 @@ $ pmnps build -p "?pb= -i -e <word>"
   }
 }
 ```
+
+可配合 `build -p` 命令进行传参操作。
+
+```
+$ pmnps build -p "?platB.before= -i -e <word>"
+```

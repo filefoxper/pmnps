@@ -39,7 +39,12 @@ function fetchPlatforms(mode?: string) {
 
 type PlatPackage = {
   name: string;
-  pmnps?: { platDependencies?: string[],ownRoot?:boolean, alias?:string,buildHook?:{before?:string,after?:string}};
+  pmnps?: {
+    platDependencies?: string[];
+    ownRoot?: boolean;
+    alias?: string;
+    buildHook?: { before?: string; after?: string };
+  };
   deps: PlatPackage[];
   dets: PlatPackage[];
   level: number;
@@ -119,31 +124,42 @@ async function resortForms(
   return levels.reverse();
 }
 
-function parseParam(pf:PlatPackage,param?:string):string|undefined{
-  if(!param){
+function parseParam(
+  pf: PlatPackage,
+  param?: string,
+  fix?: 'before' | 'after'
+): string | undefined {
+  if (!param) {
     return undefined;
   }
   const trimParam = param.trim();
-  if(!trimParam.startsWith('?')){
+  if (!trimParam.startsWith('?')) {
     return trimParam;
   }
   const paramString = trimParam.slice(1);
   const parts = paramString.split('&');
-  const entries = parts.map((part)=>{
-    const [key,value] = part.split('=');
-    if(!value||!value.trim()){
-      return undefined
-    }
-    return [key,value];
-  }).filter((d):d is [string,string]=>!!d);
-  const {name,pmnps={}} = pf;
-  const {alias} = pmnps;
+  const entries = parts
+    .map(part => {
+      const [key, value] = part.split('=');
+      if (!value || !value.trim()) {
+        return undefined;
+      }
+      return [key, value];
+    })
+    .filter((d): d is [string, string] => !!d);
+  const { name, pmnps = {} } = pf;
+  const { alias } = pmnps;
   const map = Object.fromEntries(entries);
-  if(map[name]){
-    return map[name];
+  const nameKey = fix ? `${name}.${fix}` : name;
+  if (map[nameKey]) {
+    return map[nameKey];
   }
-  if(alias&&map[alias]){
-    return map[alias];
+  if (!alias) {
+    return undefined;
+  }
+  const aliasKey = fix ? `${alias}.${fix}` : alias;
+  if (map[aliasKey]) {
+    return map[aliasKey];
   }
   return undefined;
 }
@@ -158,16 +174,20 @@ async function batchBuild(
   }
   const [packs, ...rest] = packGroups;
   const runners = packs.map(pf => {
-    const {name,pmnps={}} = pf;
-    const {buildHook={}} = pmnps;
-    const {before} = buildHook;
-    if (before){
-      const beforeBuffer = execa.commandSync(before,{cwd:path.join(platsPath,name)});
+    const { name, pmnps = {} } = pf;
+    const { buildHook = {} } = pmnps;
+    const { before } = buildHook;
+    if (before) {
+      const beforeParam = parseParam(pf, param, 'before') || '';
+      const beforeBuffer = execa.commandSync(before + beforeParam, {
+        cwd: path.join(platsPath, name)
+      });
       desc(beforeBuffer.stdout);
+      warn(beforeBuffer.stderr);
     }
-    const pam = parseParam(pf,param);
+    const pam = parseParam(pf, param);
     return execa.command(
-      `npm run build${mode?('-'+mode):''} ${pam?('-- '+pam):''}`,
+      `npm run build${mode ? '-' + mode : ''} ${pam ? '-- ' + pam : ''}`,
       {
         cwd: path.join(platsPath, name)
       }
@@ -176,9 +196,9 @@ async function batchBuild(
   const results = await Promise.all(runners);
   results.forEach((r, i) => {
     const pf = packs[i];
-    const { name,pmnps={} } = pf;
-    const {buildHook={}} = pmnps;
-    const {after} = buildHook;
+    const { name, pmnps = {} } = pf;
+    const { buildHook = {} } = pmnps;
+    const { after } = buildHook;
     const { stdout, stderr } = r;
     info(`==================== ${name} ====================`);
     if (stderr) {
@@ -186,9 +206,13 @@ async function batchBuild(
     } else {
       desc(stdout);
     }
-    if (after){
-      const afterBuffer = execa.commandSync(after,{cwd:path.join(platsPath,name)});
+    if (after) {
+      const afterParam = parseParam(pf, param, 'after') || '';
+      const afterBuffer = execa.commandSync(after + afterParam, {
+        cwd: path.join(platsPath, name)
+      });
       desc(afterBuffer.stdout);
+      warn(afterBuffer.stderr);
     }
   });
   if (!rest.length) {
@@ -244,10 +268,7 @@ function commandBuild(program: Command) {
     .command('build')
     .description('build `platform` for production.')
     .option('-n, --name <char>', 'Enter the platform name for building')
-    .option(
-      '-p, --param <char>',
-      'Enter the platform building params'
-    )
+    .option('-p, --param <char>', 'Enter the platform building params')
     .option(
       '-m, --mode <char>',
       'Use a customized build mode in package.json, like `scripts["build-${mode}"]`'

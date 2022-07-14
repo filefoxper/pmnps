@@ -315,3 +315,25 @@ $ pmnps build -p "?platA= -i -e <param desc>&platB= -i"
 $ pmnps build -p "?pb= -i"
 ```
 
+### platform config alias
+
+`pmnps.buildHook` provides two synchronous scripts `before` and `after` hook to every platform building.
+
+```
+{
+  "private": true,
+  "name": "platB",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "...start",
+    "build": "... build",
+    "build-inside": ".... build inside mode" 
+  },
+  "pmnps": {
+    "buildHook": {
+      "before":"echo build start...",
+      "after":"echo build end..."
+    }
+  }
+}
+```

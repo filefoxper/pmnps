@@ -39,7 +39,7 @@ function fetchPlatforms(mode?: string) {
 
 type PlatPackage = {
   name: string;
-  pmnps?: { platDependencies?: string[],ownRoot?:boolean, alias?:string};
+  pmnps?: { platDependencies?: string[],ownRoot?:boolean, alias?:string,buildHook?:{before?:string,after?:string}};
   deps: PlatPackage[];
   dets: PlatPackage[];
   level: number;
@@ -158,24 +158,37 @@ async function batchBuild(
   }
   const [packs, ...rest] = packGroups;
   const runners = packs.map(pf => {
+    const {name,pmnps={}} = pf;
+    const {buildHook={}} = pmnps;
+    const {before} = buildHook;
+    if (before){
+      const beforeBuffer = execa.commandSync(before,{cwd:path.join(platsPath,name)});
+      desc(beforeBuffer.stdout);
+    }
     const pam = parseParam(pf,param);
     return execa.command(
       `npm run build${mode?('-'+mode):''} ${pam?('-- '+pam):''}`,
       {
-        cwd: path.join(platsPath, pf.name)
+        cwd: path.join(platsPath, name)
       }
     );
   });
   const results = await Promise.all(runners);
   results.forEach((r, i) => {
     const pf = packs[i];
-    const { name } = pf;
+    const { name,pmnps={} } = pf;
+    const {buildHook={}} = pmnps;
+    const {after} = buildHook;
     const { stdout, stderr } = r;
     info(`==================== ${name} ====================`);
     if (stderr) {
       warn(stderr);
     } else {
       desc(stdout);
+    }
+    if (after){
+      const afterBuffer = execa.commandSync(after,{cwd:path.join(platsPath,name)});
+      desc(afterBuffer.stdout);
     }
   });
   if (!rest.length) {

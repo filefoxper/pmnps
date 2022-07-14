@@ -309,3 +309,25 @@ $ pmnps build -p "?platB= -i -e <word>"
 $ pmnps build -p "?pb= -i -e <word>"
 ```
 
+### platform 配置 alias
+
+`pmnps.buildHook` 提供了 `before` 和 `after` 两种编译介入模式，并可通过脚本的形式执行他们。在每一个平台编译前后都会检查平台 package.json 中是否有这一项，如有则按照编译的前后设定执行他们。
+
+```
+{
+  "private": true,
+  "name": "platB",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "...start",
+    "build": "... build",
+    "build-inside": ".... build inside mode" 
+  },
+  "pmnps": {
+    "buildHook": {
+      "before":"echo build start...",
+      "after":"echo build end..."
+    }
+  }
+}
+```

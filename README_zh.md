@@ -176,8 +176,8 @@ $ pmnps build -p "-i -e <param desc>"
 注意：以上写法，参数会传给所有 `npm build` 脚本运行，如果希望指定平台可以用：
 
 ```
-# 就像 url 参数一样，“平台名=参数&平台名=参数”
-$ pmnps build -p "platA= -i -e <param desc>&platB= -i"
+# 就像 url 参数一样，“?平台名=参数&平台名=参数”
+$ pmnps build -p "?platA= -i -e <param desc>&platB= -i"
 ```
 
 
@@ -304,8 +304,8 @@ build
 
 ```
 # 使用 name
-$ pmnps build -p "platB= -i -e <word>"
+$ pmnps build -p "?platB= -i -e <word>"
 # 使用 alias
-$ pmnps build -p "pb= -i -e <word>"
+$ pmnps build -p "?pb= -i -e <word>"
 ```
 

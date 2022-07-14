@@ -180,8 +180,8 @@ $ pmnps build -p "-i -e <param desc>"
 Notice, the usage about `-p` below is global for all building platforms, if you want assign the params to platforms which you want params work on, you can use the url query param to replace it.
 
 ```
-# it looks like url query param "name1=param1&name2=param2"
-$ pmnps build -p "platA= -i -e <param desc>&platB= -i"
+# it looks like url query param "?name1=param1&name2=param2"
+$ pmnps build -p "?platA= -i -e <param desc>&platB= -i"
 ```
 
 ### use config command
@@ -308,10 +308,10 @@ Add `pmnps.alias` config to give your platform a alias name.
 The alias name can only works with `build -p` command option currently.
 
 ```
-# it looks like url query param "name1=param1&name2=param2"
-$ pmnps build -p "platA= -i -e <param desc>&platB= -i"
+# it looks like url query param "?name1=param1&name2=param2"
+$ pmnps build -p "?platA= -i -e <param desc>&platB= -i"
 
 # use alias
-$ pmnps build -p "pb= -i"
+$ pmnps build -p "?pb= -i"
 ```
 

@@ -13,7 +13,7 @@ import { desc, error, info, success, warn } from '../info';
 import path from 'path';
 import fs from 'fs';
 import inquirer from 'inquirer';
-import {installAction, packageDetect} from "./refresh";
+import { installAction, packageDetect } from './refresh';
 
 const platsPath = path.join(rootPath, 'plats');
 
@@ -121,16 +121,20 @@ async function resortForms(
 
 async function batchBuild(
   packGroups: PlatPackage[][],
-  mode?: string
+  mode?: string,
+  param?: string
 ): Promise<void> {
   if (!packGroups.length) {
     return;
   }
   const [packs, ...rest] = packGroups;
   const runners = packs.map(pf => {
-    return execa('npm', ['run', mode ? `build-${mode}` : 'build'], {
-      cwd: path.join(platsPath, pf.name)
-    });
+    return execa.command(
+      `npm run build${mode?('-'+mode):''} ${param?('-- '+param):''}`,
+      {
+        cwd: path.join(platsPath, pf.name)
+      }
+    );
   });
   const results = await Promise.all(runners);
   results.forEach((r, i) => {
@@ -147,14 +151,17 @@ async function batchBuild(
   if (!rest.length) {
     return;
   }
-  return batchBuild(rest,mode);
+  return batchBuild(rest, mode, param);
 }
 
 async function buildAction({
-  plat: startPlat,
+  name: startPlat,
   mode,
-  install
-}: { plat?: string; mode?: string; install?: boolean } | undefined = {}) {
+  install,
+  param
+}:
+  | { name?: string; mode?: string; install?: boolean; param?: string }
+  | undefined = {}) {
   const rootConfig = readConfig();
   if (!rootConfig) {
     return;
@@ -181,19 +188,23 @@ async function buildAction({
       ? `start building platform: ${platform}`
       : `start building platforms`
   );
-  if (install){
+  if (install) {
     const plats = await packageDetect(platsPath);
     await installAction(plats);
   }
   const pfs = await resortForms(forms, platform || undefined);
-  await batchBuild(pfs,mode);
+  await batchBuild(pfs, mode, param);
 }
 
 function commandBuild(program: Command) {
   program
     .command('build')
     .description('build `platform` for production.')
-    .option('-p, --plat <char>', 'Enter the platform for development')
+    .option('-n, --name <char>', 'Enter the platform name for building')
+    .option(
+      '-p, --param <char>',
+      'Enter the platform building params like `"?a&b=param1"`  or `"??a&b=param1"`, it trans to `-a -b param1` or `--a --b param1`'
+    )
     .option(
       '-m, --mode <char>',
       'Use a customized build mode in package.json, like `scripts["build-${mode}"]`'

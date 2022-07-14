@@ -156,19 +156,25 @@ or
 
 ```
 # build a special platform
-$ pmnps build -p <platform>
+$ pmnps build -n <platform name>
 ```
 
 If you want to build with a mode you set with command `config`, you can use option param `-m <mode>`.
 
 ```
-$ pmnps build -p <platform> -m <mode>
+$ pmnps build -n <platform name> -m <mode>
 ```
 
 If you want to install dependencies before build, you can use option param `-i`.
 
 ```
-$ pmnps build -p <platform> -m <mode> -i
+$ pmnps build -n <platform name> -m <mode> -i
+```
+
+If you want to add param to npm build script, you can use option param `-p <param>`.
+
+```
+$ pmnps build -p "-i -e <param desc>"
 ```
 
 ### use config command

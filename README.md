@@ -177,6 +177,13 @@ If you want to add param to npm build script, you can use option param `-p <para
 $ pmnps build -p "-i -e <param desc>"
 ```
 
+Notice, the usage about `-p` below is global for all building platforms, if you want assign the params to platforms which you want params work on, you can use the url query param to replace it.
+
+```
+# it looks like url query param "name1=param1&name2=param2"
+$ pmnps build -p "platA= -i -e <param desc>&platB= -i"
+```
+
 ### use config command
 
 The `config` command allows you to do more configs. You can open `git usage`, `rename workspace` and add `build mode` for your project. The `build mode` is a string word which will be added into your `package.json > scripts` like `scripts.build-<mode>`, when you use command `build` with option `-m <mode>`, it runs `npm run build-<mode>` script.
@@ -277,3 +284,34 @@ Add `pmnps.ownRoot` config to describe a platform which installs `node_modules` 
   }
 }
 ```
+
+### platform config alias
+
+Add `pmnps.alias` config to give your platform a alias name.
+
+```
+{
+  "private": true,
+  "name": "platB",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "...start",
+    "build": "... build",
+    "build-inside": ".... build inside mode" 
+  },
+  "pmnps": {
+    "alias": "pb"
+  }
+}
+```
+
+The alias name can only works with `build -p` command option currently.
+
+```
+# it looks like url query param "name1=param1&name2=param2"
+$ pmnps build -p "platA= -i -e <param desc>&platB= -i"
+
+# use alias
+$ pmnps build -p "pb= -i"
+```
+

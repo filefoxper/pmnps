@@ -173,6 +173,13 @@ $ pmnps build -i
 $ pmnps build -p "-i -e <param desc>"
 ```
 
+注意：以上写法，参数会传给所有 `npm build` 脚本运行，如果希望指定平台可以用：
+
+```
+# 就像 url 参数一样，“平台名=参数&平台名=参数”
+$ pmnps build -p "platA= -i -e <param desc>&platB= -i"
+```
+
 
 ### 使用 config 命令
 
@@ -270,3 +277,35 @@ platC -> package.json
   }
 }
 ```
+
+### platform 配置 alias
+
+项目别名配置，目前只对 `build -p` 命令起作用。
+
+package.json
+
+```
+{
+  "private": true,
+  "name": "platB",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "...start",
+    "build": "... build",
+    "build-inside": ".... build inside mode" 
+  },
+  "pmnps": {
+    "alias": “pb”
+  }
+}
+```
+
+build
+
+```
+# 使用 name
+$ pmnps build -p "platB= -i -e <word>"
+# 使用 alias
+$ pmnps build -p "pb= -i -e <word>"
+```
+

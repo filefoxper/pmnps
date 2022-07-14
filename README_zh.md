@@ -152,7 +152,7 @@ $ pmnps build
 
 ```
 # 编译指定平台
-$ pmnps build -p <platform>
+$ pmnps build -n <platform name>
 ```
 
 如果想要使用通过命令 `config` 预先设置的 build 模式来代替当前的 `npm run build` 脚本，我们可以使用 `-m <mode>` 选项。
@@ -166,6 +166,13 @@ $ pmnps build -m <mode>
 ```
 $ pmnps build -i
 ```
+
+如果想要使用 npm 脚本传参，可使用 `-p <param>` 选项。
+
+```
+$ pmnps build -p "-i -e <param desc>"
+```
+
 
 ### 使用 config 命令
 

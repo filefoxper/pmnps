@@ -39,7 +39,7 @@ function fetchPlatforms(mode?: string) {
 
 type PlatPackage = {
   name: string;
-  pmnps?: { platDependencies: string[] };
+  pmnps?: { platDependencies?: string[],ownRoot?:boolean, alias?:string};
   deps: PlatPackage[];
   dets: PlatPackage[];
   level: number;
@@ -119,6 +119,34 @@ async function resortForms(
   return levels.reverse();
 }
 
+function parseParam(pf:PlatPackage,param?:string):string|undefined{
+  if(!param){
+    return undefined;
+  }
+  const trimParam = param.trim();
+  if(!trimParam.includes('&')){
+    return trimParam;
+  }
+  const parts = trimParam.split('&');
+  const entries = parts.map((part)=>{
+    const [key,value] = part.split('=');
+    if(!value||!value.trim()){
+      return undefined
+    }
+    return [key,value];
+  }).filter((d):d is [string,string]=>!!d);
+  const {name,pmnps={}} = pf;
+  const {alias} = pmnps;
+  const map = Object.fromEntries(entries);
+  if(map[name]){
+    return map[name];
+  }
+  if(alias&&map[alias]){
+    return map[alias];
+  }
+  return undefined;
+}
+
 async function batchBuild(
   packGroups: PlatPackage[][],
   mode?: string,
@@ -129,8 +157,9 @@ async function batchBuild(
   }
   const [packs, ...rest] = packGroups;
   const runners = packs.map(pf => {
+    const pam = parseParam(pf,param);
     return execa.command(
-      `npm run build${mode?('-'+mode):''} ${param?('-- '+param):''}`,
+      `npm run build${mode?('-'+mode):''} ${pam?('-- '+pam):''}`,
       {
         cwd: path.join(platsPath, pf.name)
       }

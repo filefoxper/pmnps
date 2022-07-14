@@ -124,10 +124,11 @@ function parseParam(pf:PlatPackage,param?:string):string|undefined{
     return undefined;
   }
   const trimParam = param.trim();
-  if(!trimParam.includes('&')){
+  if(!trimParam.startsWith('?')){
     return trimParam;
   }
-  const parts = trimParam.split('&');
+  const paramString = trimParam.slice(1);
+  const parts = paramString.split('&');
   const entries = parts.map((part)=>{
     const [key,value] = part.split('=');
     if(!value||!value.trim()){

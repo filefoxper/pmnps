@@ -255,11 +255,18 @@ async function buildAction({
       ? `start building platform: ${platform}`
       : `start building platforms`
   );
-  if (install) {
-    const plats = await packageDetect(platsPath);
-    await installAction(plats);
-  }
   const pfs = await resortForms(forms, platform || undefined);
+  if (install) {
+    const platNameSet = new Set(
+      pfs.flatMap(pks => pks.map(({ name }) => name))
+    );
+    const plats = await packageDetect(platsPath);
+    await installAction(
+      plats.filter(
+        ({ packageJson }) => packageJson && platNameSet.has(packageJson.name)
+      )
+    );
+  }
   await batchBuild(pfs, mode, param);
 }
 

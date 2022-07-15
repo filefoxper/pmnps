@@ -5,7 +5,7 @@ import {
   readPackageJsonAsync,
   readRootPackageJson,
   rootPath,
-  writeRootPackageJson
+  writeRootPackageJson, writeUnForbiddenManualInstall
 } from '../file';
 import { desc, error, info, log, success, warn } from '../info';
 import path from 'path';
@@ -110,6 +110,7 @@ async function installOwnRootPlats(
   }
   const [current, ...rest] = plats;
   const { dirPath, packageJson } = current;
+  await writeUnForbiddenManualInstall(dirPath);
   info(
     `==================== install own root platform ${
       (packageJson || { name: 'unknown' }).name

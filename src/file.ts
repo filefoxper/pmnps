@@ -1,9 +1,9 @@
 import fs from 'fs';
 import { Config } from './type';
 import path from 'path';
-import { error } from './info';
+import {error, log, warn} from './info';
 import { basicDevDependencies, prettier } from './resource';
-import {resolve} from "eslint-import-resolver-typescript";
+import { resolve } from 'eslint-import-resolver-typescript';
 
 const actualRootPath = process.cwd();
 
@@ -51,7 +51,7 @@ function generateNewDevDep(packageJson: Record<string, any> | undefined) {
     return basicDevDependencies;
   }
   const sourceDev = packageJson.devDependencies;
-  return {...basicDevDependencies,...sourceDev};
+  return { ...basicDevDependencies, ...sourceDev };
 }
 
 function writeRootPackageJson(workspace: string) {
@@ -75,7 +75,7 @@ function writeRootPackageJson(workspace: string) {
   fs.writeFileSync(packageJsonPath, content);
 }
 
-function readPackageJson(locationPath: string,silence?:boolean) {
+function readPackageJson(locationPath: string, silence?: boolean) {
   if (!fs.existsSync(locationPath)) {
     return undefined;
   }
@@ -84,35 +84,100 @@ function readPackageJson(locationPath: string,silence?:boolean) {
     const content = data.toString('utf-8');
     return JSON.parse(content);
   } catch (e) {
-    if(!silence){
+    if (!silence) {
       error('The `package.json` file is invalidate, please check the format.');
     }
     return undefined;
   }
 }
 
-function readJsonAsync(locationPath: string){
-  return new Promise((resolve, reject)=>{
-    fs.readFile(locationPath,(err, data)=>{
-      if(err){
+function readJsonAsync(locationPath: string) {
+  return new Promise((resolve, reject) => {
+    fs.readFile(locationPath, (err, data) => {
+      if (err) {
         reject(err);
         return;
       }
       const content = data.toString('utf-8');
       resolve(JSON.parse(content));
-    })
+    });
   });
 }
 
-async function readPackageJsonAsync(locationPath: string,silence?:boolean){
-  if(!fs.existsSync(locationPath)){
+function readFileAsync(locationPath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    fs.readFile(locationPath, (err, data) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      const content = data.toString('utf-8');
+      resolve(content);
+    });
+  });
+}
+
+function writeFileAsync(locationPath: string, data: string) {
+  return new Promise((resolve, reject) => {
+    fs.writeFile(locationPath, data, err => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(data);
+    });
+  });
+}
+
+function writeJsonAsync(locationPath: string, json: Record<string, any>) {
+  return writeFileAsync(locationPath, JSON.stringify(json));
+}
+
+const forbiddenUrl = 'registry=https://forbidden.manual.install';
+
+async function writeForbiddenManualInstall(dirPath: string) {
+  const npmConfigPath = path.join(dirPath, '.npmrc');
+  if (fs.existsSync(npmConfigPath)) {
+    warn('Has detected `.npmrc` file, `npm install` will not be forbidden.');
+    return;
+  }
+  const json = readPackageJson(dirPath, true);
+  if (!json) {
+    log('Has forbidden manual `npm install`');
+    return writeFileAsync(npmConfigPath, forbiddenUrl);
+  }
+  const { pmnps = {} } = json;
+  const { ownRoot } = pmnps;
+  if (ownRoot) {
+    log('Has detected `ownRoot` config, `npm install` will not be forbidden.');
+    return;
+  }
+  log('Has forbidden manual `npm install`');
+  return writeFileAsync(npmConfigPath, forbiddenUrl);
+}
+
+async function writeUnForbiddenManualInstall(dirPath: string) {
+  const npmConfigPath = path.join(dirPath, '.npmrc');
+  if (!fs.existsSync(npmConfigPath)) {
+    return;
+  }
+  const data = await readFileAsync(npmConfigPath);
+  if (!data.includes(forbiddenUrl)) {
+    return;
+  }
+  log('Has detected `ownRoot` config, allow manual `npm install`');
+  return writeFileAsync(npmConfigPath, data.replace(forbiddenUrl, ''));
+}
+
+async function readPackageJsonAsync(locationPath: string, silence?: boolean) {
+  if (!fs.existsSync(locationPath)) {
     return undefined;
   }
   try {
     const data = await readJsonAsync(locationPath);
     return data as Record<string, any>;
-  }catch (e){
-    if(!silence){
+  } catch (e) {
+    if (!silence) {
       error('The `package.json` file is invalidate, please check the format.');
     }
     return undefined;
@@ -207,5 +272,7 @@ export {
   copyResource,
   copyFolder,
   readPackageJsonAsync,
+  writeForbiddenManualInstall,
+  writeUnForbiddenManualInstall,
   rootPath
 };

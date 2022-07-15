@@ -10,7 +10,7 @@ import {
   copyResource,
   readConfig,
   writeConfig,
-  copyFolder
+  copyFolder, writeForbiddenManualInstall
 } from '../file';
 import path from 'path';
 import { basicDevDependencies, selectJsFormat } from '../resource';
@@ -246,18 +246,16 @@ async function packAction({ name: n }: { name?: string } | undefined = {}) {
   const copied = await copyTemplate(name);
   const config = readPackConfig(name);
   let formats = config ? config.jsFormats : null;
-  if (!copied) {
-    if (!formats) {
-      const { formats: f } = await inquirer.prompt([
-        {
-          name: 'formats',
-          type: 'checkbox',
-          message: 'Choice code formats:',
-          choices: ['ts', 'tsx', 'js', 'jsx']
-        }
-      ]);
-      formats = f;
-    }
+  if (!copied && !config) {
+    const { formats: f } = await inquirer.prompt([
+      {
+        name: 'formats',
+        type: 'checkbox',
+        message: 'Choice code formats:',
+        choices: ['ts', 'tsx', 'js', 'jsx']
+      }
+    ]);
+    formats = f;
     log('config package...');
     createPack(name, formats!);
     const fileEnd = selectJsFormat(formats!);
@@ -269,6 +267,7 @@ async function packAction({ name: n }: { name?: string } | undefined = {}) {
   }
   const { git } = rootConfig;
   writePackConfig(name, formats || ['js']);
+  await writeForbiddenManualInstall(path.join(packsPath, name));
   const isNew = !config;
   await Promise.all([
     prettierProject(name, isNew),

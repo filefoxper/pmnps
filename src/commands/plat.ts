@@ -10,7 +10,8 @@ import {
   copyResource,
   readConfig,
   writeConfig,
-  copyFolder
+  copyFolder,
+  writeForbiddenManualInstall
 } from '../file';
 import path from 'path';
 import { basicDevDependencies, selectJsFormat } from '../resource';
@@ -224,10 +225,7 @@ async function prettierProject(name: string, isNew: boolean) {
   }
 }
 
-async function gitAddition(
-  name: string,
-  git?: boolean
-): Promise<void> {
+async function gitAddition(name: string, git?: boolean): Promise<void> {
   if (git) {
     await execa('git', ['add', path.join(platsPath, name)], {
       cwd: rootPath
@@ -240,7 +238,7 @@ async function platAction({ name: n }: { name?: string } | undefined = {}) {
   if (!rootConfig) {
     return;
   }
-  if (!fs.existsSync(platsPath)){
+  if (!fs.existsSync(platsPath)) {
     fs.mkdirSync(platsPath);
   }
   let name = n && n.trim() ? n.trim() : null;
@@ -258,21 +256,19 @@ async function platAction({ name: n }: { name?: string } | undefined = {}) {
     warn('The name of platform should not be null');
     return;
   }
-  const copied = await copyTemplate(name);
   const config = readPlatConfig(name);
+  const copied = await copyTemplate(name);
   let formats = config ? config.jsFormats : null;
-  if (!copied) {
-    if (!formats) {
-      const { formats: f } = await inquirer.prompt([
-        {
-          name: 'formats',
-          type: 'checkbox',
-          message: 'Choice code formats:',
-          choices: ['ts', 'tsx', 'js', 'jsx']
-        }
-      ]);
-      formats = f;
-    }
+  if (!copied && !config) {
+    const { formats: f } = await inquirer.prompt([
+      {
+        name: 'formats',
+        type: 'checkbox',
+        message: 'Choice code formats:',
+        choices: ['ts', 'tsx', 'js', 'jsx']
+      }
+    ]);
+    formats = f;
     log('config plat...');
     createPlat(name, formats || ['js'], rootConfig);
     const fileEnd = selectJsFormat(formats!);
@@ -283,12 +279,10 @@ async function platAction({ name: n }: { name?: string } | undefined = {}) {
     log('config plat...');
   }
   writePlatConfig(name, formats || ['js']);
+  await writeForbiddenManualInstall(path.join(platsPath, name));
   const { git } = rootConfig;
   const isNew = !config;
-  await Promise.all([
-    prettierProject(name, isNew),
-    gitAddition(name, git)
-  ]);
+  await Promise.all([prettierProject(name, isNew), gitAddition(name, git)]);
   await refreshAction();
   success(`create platform "${name}" success`);
 }

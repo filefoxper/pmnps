@@ -211,19 +211,12 @@ async function prettierProject(name: string, isNew: boolean) {
 
 async function gitAddition(
   name: string,
-  isNew: boolean,
   git?: boolean
 ): Promise<void> {
   if (git) {
-    if (isNew) {
-      await execa('git', ['add', path.join(packsPath, name)], {
-        cwd: rootPath
-      });
-    } else {
-      await execa('git', ['add', path.join(packsPath, name, configName)], {
-        cwd: rootPath
-      });
-    }
+    await execa('git', ['add', path.join(packsPath, name)], {
+      cwd: rootPath
+    });
   }
 }
 
@@ -279,7 +272,7 @@ async function packAction({ name: n }: { name?: string } | undefined = {}) {
   const isNew = !config;
   await Promise.all([
     prettierProject(name, isNew),
-    gitAddition(name, isNew, git)
+    gitAddition(name, git)
   ]);
   await refreshAction();
   success(`create package "${name}" success`);

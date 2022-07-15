@@ -247,6 +247,9 @@ async function platAction({ name: n }: { name?: string } | undefined = {}) {
   if (!rootConfig) {
     return;
   }
+  if (!fs.existsSync(platsPath)){
+    fs.mkdirSync(platsPath);
+  }
   let name = n && n.trim() ? n.trim() : null;
   if (!name) {
     const { name: nm } = await inquirer.prompt([

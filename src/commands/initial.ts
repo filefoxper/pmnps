@@ -6,7 +6,7 @@ import {
   writeConfig,
   writeRootPackageJson,
   copyResource,
-  createFileIfNotExist
+  createFileIfNotExist, readConfig
 } from '../file';
 import { desc, error, info, success, warn } from '../info';
 import path from 'path';
@@ -21,6 +21,11 @@ const packsPath = path.join(projectPath, 'packages');
 const platsPath = path.join(projectPath, 'plats');
 
 async function initialAction(){
+  const {lock} = readConfig(true)||{};
+  if (lock){
+    info('The pmnps config is locked, if you want to config it, please use command `config`');
+    return;
+  }
   const { workspace } = await inquirer.prompt([
     {
       name: 'workspace',
@@ -67,6 +72,16 @@ async function initialAction(){
           }
       );
       writeConfig({ git: true });
+    }
+    const { lock } = await inquirer.prompt([
+      {
+        name: 'lock',
+        type: 'confirm',
+        message: 'Do you want to lock pmnps config?',
+      }
+    ]);
+    if (lock){
+      writeConfig({lock:true});
     }
     await refreshAction();
     success('initial success!');

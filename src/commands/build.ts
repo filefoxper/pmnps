@@ -233,6 +233,9 @@ async function buildAction({
   if (!rootConfig) {
     return;
   }
+  if(!fs.existsSync(platsPath)){
+    fs.mkdirSync(platsPath);
+  }
   let platform = startPlat;
   const forms = fetchPlatforms(mode);
   if (!forms.length) {

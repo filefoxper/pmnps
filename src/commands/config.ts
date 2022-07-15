@@ -26,10 +26,13 @@ const RE_GIT = 0b00000010;
 
 const ADD_BUILD_MODE = 0b00000100;
 
+const LOCK_OR_UNLOCK = 0b00001000;
+
 const configOptionMap = new Map([
   ['rename workspace', RENAME],
   ['config git', RE_GIT],
-  ['add build mode', ADD_BUILD_MODE]
+  ['add build mode', ADD_BUILD_MODE],
+  ['lock/unlock', LOCK_OR_UNLOCK],
 ]);
 
 async function configAction() {
@@ -37,7 +40,7 @@ async function configAction() {
   if (!rootConfig) {
     return;
   }
-  let { workspace, git, buildModes } = rootConfig;
+  let { workspace, git, buildModes,lock } = rootConfig;
   const { configs } = await inquirer.prompt([
     {
       name: 'configs',
@@ -79,7 +82,17 @@ async function configAction() {
     const set = new Set([...(buildModes || []), buildMode]);
     buildModes = [...set];
   }
-  writeConfig({ workspace, git, buildModes });
+  if((code & LOCK_OR_UNLOCK) === LOCK_OR_UNLOCK){
+    const { lock: l } = await inquirer.prompt([
+      {
+        name: 'lock',
+        type: 'confirm',
+        message: `Do you want to ${lock ? 'unlock' : 'lock'} pmnps config?`
+      }
+    ]);
+    lock = l?!lock:lock;
+  }
+  writeConfig({ workspace, git, buildModes,lock });
   await refreshAction();
   success('config success');
 }

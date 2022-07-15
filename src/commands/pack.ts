@@ -232,6 +232,9 @@ async function packAction({ name: n }: { name?: string } | undefined = {}) {
   if (!rootConfig) {
     return;
   }
+  if (!fs.existsSync(packsPath)){
+    fs.mkdirSync(packsPath);
+  }
   let name = n && n.trim() ? n.trim() : null;
   if (!name) {
     const { name: nm } = await inquirer.prompt([

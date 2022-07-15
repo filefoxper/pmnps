@@ -34,6 +34,9 @@ function fetchPlatforms() {
 }
 
 async function startAction({ plat: startPlat }: { plat?: string }|undefined = {}) {
+  if(!fs.existsSync(platsPath)){
+    fs.mkdirSync(platsPath);
+  }
   let platform = startPlat;
   const forms = fetchPlatforms();
   if (!forms.length) {

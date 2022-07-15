@@ -35,6 +35,9 @@ function packageDetect(dirPath: string): Promise<
     dirPath: string;
   }[]
 > {
+  if (!fs.existsSync(dirPath)){
+    return Promise.resolve([]);
+  }
   const list = fs.readdirSync(dirPath);
   const fetches = list.map(dirName =>
     (async function pack() {
@@ -154,6 +157,12 @@ async function installAction(plats:{
 
 async function refreshAction() {
   log('detect and install dependencies...');
+  if (!fs.existsSync(packsPath)){
+    fs.mkdirSync(packsPath);
+  }
+  if (!fs.existsSync(platsPath)){
+    fs.mkdirSync(platsPath);
+  }
   const plats = await combineDeps();
   await installAction(plats);
   await execa('prettier', ['--write', path.join(rootPath, 'package.json')], {

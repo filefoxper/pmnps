@@ -1,7 +1,8 @@
 export type Config = {
   workspace: string;
   git?: boolean;
-  buildModes?:string[]
+  buildModes?:string[],
+  lock?:boolean
 };
 
 export type PackConfig = {

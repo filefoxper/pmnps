@@ -1,11 +1,12 @@
 import { Command } from 'commander';
 import inquirer from 'inquirer';
-import { mkdirIfNotExist, readConfig, rootPath, writeConfig } from '../file';
+import {mkdirIfNotExist, rootPath, writeJsonAsync} from '../file';
 import path from 'path';
 import { TemplateConfig } from '../type';
 import fs from 'fs';
 import execa from 'execa';
-import {desc, error, success, warn} from '../info';
+import {desc, success, warn} from '../info';
+import {readConfig} from "../root";
 
 const templateConfigName = 'pmnps.template.json';
 
@@ -25,7 +26,7 @@ async function writeTemplateConfig(
   const filePath = path.join(dirPath, templateConfigName);
   const data = readTemplateConfig(dirPath);
   if (!data) {
-    fs.writeFileSync(filePath, JSON.stringify(object));
+    await writeJsonAsync(filePath, object);
     return true;
   }
   if (data.type === object.type) {
@@ -42,7 +43,7 @@ async function writeTemplateConfig(
   if (!confirm) {
     return false;
   }
-  fs.writeFileSync(filePath, JSON.stringify(object));
+  await writeJsonAsync(filePath, object);
   return true;
 }
 
@@ -53,7 +54,7 @@ async function templateAction({ name: n }: { name?: string }|undefined = {}) {
   }
   const { git } = rootConfig;
   const templatesPath = path.join(rootPath, 'templates');
-  mkdirIfNotExist(templatesPath);
+  const mkTemplateRooting = mkdirIfNotExist(templatesPath);
   let name = n;
   if (!n) {
     const { name: nm } = await inquirer.prompt([
@@ -70,7 +71,9 @@ async function templateAction({ name: n }: { name?: string }|undefined = {}) {
     warn('The template name should not be null');
     return;
   }
-
+  await mkTemplateRooting;
+  const creatingTemplatePath = path.join(templatesPath, name);
+  const mkTemplateDirWorking =  mkdirIfNotExist(creatingTemplatePath);
   const { type: templateType } = await inquirer.prompt([
     {
       name: 'type',
@@ -81,8 +84,7 @@ async function templateAction({ name: n }: { name?: string }|undefined = {}) {
     }
   ]);
 
-  const creatingTemplatePath = path.join(templatesPath, name);
-  mkdirIfNotExist(creatingTemplatePath);
+  await mkTemplateDirWorking;
   const result = await writeTemplateConfig(creatingTemplatePath, { name, type: templateType });
   if(!result){
     desc('The template creation is canceled.');

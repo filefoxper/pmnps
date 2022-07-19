@@ -43,10 +43,10 @@ $ pmnps initial
 
 该命令用于生成基本 `monorepo` 多平台管理项目目录。
 
-### 使用 pack 命令
+### 使用 package 命令
 
 ```
-$ pmnps pack -n test
+$ pmnps package -n test
 ```
 
 生成目录文件如下:
@@ -59,18 +59,17 @@ $ pmnps pack -n test
       - src
       index.ts
       package.json
-      pmnps.pack.json
   - plats
   package.json
-  pmnps.json
+  .pmnpsrc.json
 ```
 
 该命令用于添加一个 package 平台依赖包，并将依赖安装至根 `node_modules` 目录。
 
-### 使用 plat 命令
+### 使用 platform 命令
 
 ```
-$ pmnps plat -n web-test
+$ pmnps platform -n web-test
 ```
 
 生成目录文件如下:
@@ -83,15 +82,13 @@ $ pmnps plat -n web-test
       - src
       index.ts
       package.json
-      pmnps.pack.json
   - plats
     - web-test
       -src
         index.tsx
       package.json
-      pmnps.plat.json
   package.json
-  pmnps.json
+  .pmnpsrc.json
 ```
 
 该命令用于添加一个 platform 平台项目入口，并将依赖安装至根 `node_modules` 目录。
@@ -112,15 +109,13 @@ $ pmnps refresh
       - src
       index.ts
       package.json
-      pmnps.pack.json
   - plats
     - web-test
       -src
         index.tsx
       package.json
-      pmnps.plat.json
   package.json
-  pmnps.json
+  .pmnpsrc.json
 ```
 
 该命令用于刷新项目，并将所有第三方依赖安装至根 `node_modules` 目录。
@@ -136,7 +131,7 @@ $ pmnps start
 或
 
 ```
-$ pmnps start -p <platform>
+$ pmnps start -n <platform>
 ```
 
 ### 使用 build 命令
@@ -337,3 +332,31 @@ $ pmnps build -p "?pb= -i -e <word>"
 ```
 $ pmnps build -p "?platB.before= -i -e <word>"
 ```
+
+## .pmnpsrc.json
+
+`.pmnpsrc.json` 文件是项目的入口配置文件，它包含了 `workspace`、`git`、`lock`、`plugins` 等配置信息。
+
+```
+{
+  "workspace": "workspace",
+  "git": true,
+  "lock": true,
+  "plugins": ["pmnps-dependencies-detect-plugin"]
+}
+```
+
+## plugins
+
+plugin 插件系统是自 `pmnps@2.0.0` 加入的，我们可以通过配置 `.pmnpsrc.json` 文件的方式使用它们。在配置它们之前，请先将你需要使用的插件加入 `package.json` 文件的 `devDependencies` 中。
+
+## 更新
+
+### v2.0.0
+
+* `start` 命令参数 `-p` 统一改为 `-n`。
+* `pack` 命令更改为 `package` 命令。
+* `plat` 命令更改为 `platform` 命令。
+* `pmnps.config.json` 文件更改为 `.pmnpsrc.json`。
+* 包和平台中的 `pmnps.pack.json`、`pmnps.plat.json` 被废止。
+* 添加了简单的插件系统

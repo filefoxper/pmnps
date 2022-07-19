@@ -47,10 +47,10 @@ after running:
 
 This command can create a monorepo project and install the `dependencies & devDependencies` into root `node_modules`.
 
-### use pack command
+### use package command
 
 ```
-$ pmnps pack -n test
+$ pmnps package -n test
 ```
 
 after running:
@@ -63,18 +63,17 @@ after running:
       - src
       index.ts
       package.json
-      pmnps.pack.json
   - plats
   package.json
-  pmnps.json
+  .pmnpsrc.json
 ```
 
 This command can add a package and install the `dependencies & devDependencies` into root `node_modules`.
 
-### use plat command
+### use platform command
 
 ```
-$ pmnps plat -n web-test
+$ pmnps platform -n web-test
 ```
 
 after running:
@@ -87,15 +86,13 @@ after running:
       - src
       index.ts
       package.json
-      pmnps.pack.json
   - plats
     - web-test
       -src
         index.tsx
       package.json
-      pmnps.plat.json
   package.json
-  pmnps.json
+  .pmnpsrc.json
 ```
 
 This command can add a platform and install the dependencies and devDependencies into root `node_modules`.
@@ -116,18 +113,16 @@ after running:
       - src
       index.ts
       package.json
-      pmnps.pack.json
   - plats
     - web-test
       -src
         index.tsx
       package.json
-      pmnps.plat.json
   package.json
-  pmnps.json
+  .pmnpsrc.json
 ```
 
-This command can install all the dependencies and devDependencies from `packages` and `plats` into the root `node_modules`.
+This command can install all the dependencies and devDependencies from `packages` and `platforms` into the root `node_modules`.
 
 ### use start command
 
@@ -140,7 +135,7 @@ $ pmnps start
 or
 
 ```
-$ pmnps start -p <platform>
+$ pmnps start -n <platform>
 ```
 
 ### use build command
@@ -343,3 +338,40 @@ Use `build -p`, we can provide params for `before` or `after` scripts.
 ```
 $ pmnps build -p "?platB.before= -i -e <word>"
 ```
+
+## .pmnpsrc.json
+
+The file `pmnpsrc.json` is the config file for whole root project, it contains `workspace name`, `git usage`, `lock flag` and `plugins`.
+
+```
+{
+  "workspace": "workspace",
+  "git": true,
+  "lock": true,
+  "plugins": ["pmnps-dependencies-detect-plugin"]
+}
+```
+
+## plugins
+
+The plugins is added from `pmnps@2.0.0`, you can write plugins and publish them to `npm`, or pick the plugins you need, and config them in `pmnpsrc.json` file for usage.
+
+```
+{
+  "workspace": "workspace",
+  "git": true,
+  "lock": true,
+  "plugins": ["pmnps-dependencies-detect-plugin"]
+}
+```
+
+And before config them, you should add the `plugin` into `devDependencies` in `package.json` file.
+
+## update
+
+* `start -p` changes to `start -n`
+* `pack` command changes to `package` command
+* `plat` command changes to `platform` command
+* The root config `pmnps.config.json` changes to `.pmnpsrc.json`
+* `pmnps.pack.json` & `pmnps.plat.json` is deprecated
+* add simple plugin system.

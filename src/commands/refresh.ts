@@ -1,15 +1,18 @@
 import { Command } from 'commander';
 import execa from 'execa';
-import {
-  readPackageJson,
-  readPackageJsonAsync,
-  readRootPackageJson,
-  rootPath,
-  writeRootPackageJson, writeUnForbiddenManualInstall
-} from '../file';
+import { mkdirIfNotExist, rootPath } from '../file';
 import { desc, error, info, log, success, warn } from '../info';
 import path from 'path';
 import fs from 'fs';
+import { readPackageJson, writeUnForbiddenManualInstall } from '../resource';
+import {
+  InvalidDetectResult,
+  PackageJson,
+  PlatPackageJson,
+  ValidDetectResult
+} from '../type';
+import {getPluginBundle} from "../plugins";
+import {readConfig} from "../root";
 
 const projectPath = rootPath;
 
@@ -28,27 +31,25 @@ function removeDepPacks(
   return { ...packageJson, dependencies: newDep };
 }
 
-function packageDetect(dirPath: string): Promise<
-  {
-    packageJson: Record<string, any> | undefined;
-    dirName: string;
-    dirPath: string;
-  }[]
-> {
-  if (!fs.existsSync(dirPath)){
+function packageDetect<T extends PackageJson | PlatPackageJson>(
+  dirPath: string
+): Promise<(ValidDetectResult<T> | InvalidDetectResult)[]> {
+  if (!fs.existsSync(dirPath)) {
     return Promise.resolve([]);
   }
   const list = fs.readdirSync(dirPath);
   const fetches = list.map(dirName =>
     (async function pack() {
       const packageDirPath = path.join(dirPath, dirName);
-      const packageJson = await readPackageJsonAsync(
+      const packageJson = await readPackageJson<T>(
         path.join(packageDirPath, 'package.json')
       );
       return { packageJson, dirName, dirPath: packageDirPath };
     })()
   );
-  return Promise.all(fetches);
+  return Promise.all(fetches) as Promise<
+    (ValidDetectResult<T> | InvalidDetectResult)[]
+  >;
 }
 
 function isOwnRootPlat(json: Record<string, any>): boolean {
@@ -57,13 +58,15 @@ function isOwnRootPlat(json: Record<string, any>): boolean {
   return !!ownRoot;
 }
 
-async function combineDeps() {
+async function combineDeps(): Promise<
+  [ValidDetectResult<PackageJson>[], ValidDetectResult<PlatPackageJson>[]]
+> {
   const [root, packs, plats] = await Promise.all([
-    readPackageJsonAsync(path.join(projectPath, 'package.json')),
-    packageDetect(packsPath),
-    packageDetect(platsPath)
+    readPackageJson<PackageJson>(path.join(projectPath, 'package.json')),
+    packageDetect<PackageJson>(packsPath),
+    packageDetect<PlatPackageJson>(platsPath)
   ]);
-  const packageJson = packs.reduce((data: Record<string, any>, pack) => {
+  const packageJson = packs.reduce((data: PackageJson, pack) => {
     const { packageJson } = pack;
     if (!packageJson) {
       return data;
@@ -74,10 +77,11 @@ async function combineDeps() {
       dependencies: { ...dependencies, ...data.dependencies },
       devDependencies: { ...devDependencies, ...data.devDependencies }
     };
-  }, root as Record<string, any>);
-  const list: string[] = packs
-    .map(({ packageJson }) => (packageJson ? packageJson.name : null))
-    .filter((d): d is string => d);
+  }, root as PackageJson);
+  const validPacks = packs.filter(
+    (d): d is ValidDetectResult<PackageJson> => !!d.packageJson
+  );
+  const list: string[] = validPacks.map(({ packageJson }) => packageJson.name);
   const finalPackageJson = plats.reduce((data, pack) => {
     const current = pack.packageJson;
     if (!current || isOwnRootPlat(current)) {
@@ -95,7 +99,12 @@ async function combineDeps() {
     path.join(projectPath, 'package.json'),
     JSON.stringify(validPackageJson)
   );
-  return plats;
+  return [
+    validPacks,
+    plats.filter(
+      (d): d is ValidDetectResult<PlatPackageJson> => !!d.packageJson
+    )
+  ];
 }
 
 async function installOwnRootPlats(
@@ -111,7 +120,7 @@ async function installOwnRootPlats(
   const [current, ...rest] = plats;
   const { dirPath, packageJson } = current;
   await writeUnForbiddenManualInstall(dirPath);
-  info(
+  log(
     `==================== install own root platform ${
       (packageJson || { name: 'unknown' }).name
     } dependencies ====================`
@@ -130,11 +139,7 @@ async function installOwnRootPlats(
   return installOwnRootPlats(rest);
 }
 
-async function installAction(plats:{
-  packageJson: Record<string, any> | undefined;
-  dirName: string;
-  dirPath: string;
-}[]){
+async function installAction(plats: ValidDetectResult<PlatPackageJson>[]) {
   const ownRoots = plats.filter(({ packageJson }) => {
     if (!packageJson) {
       return false;
@@ -142,8 +147,8 @@ async function installAction(plats:{
     const { pmnps } = packageJson;
     return pmnps && pmnps.ownRoot;
   });
-  info(
-      '==================== install project root dependencies ===================='
+  log(
+    '==================== install project root dependencies ===================='
   );
   const subprocess = execa('npm', ['install'], {
     cwd: rootPath
@@ -154,25 +159,34 @@ async function installAction(plats:{
   subprocess.stdout.pipe(process.stdout);
   await subprocess;
   await installOwnRootPlats(ownRoots);
+  return ownRoots;
 }
 
-async function refreshAction() {
-  log('detect and install dependencies...');
-  if (!fs.existsSync(packsPath)){
-    fs.mkdirSync(packsPath);
+async function refreshAction():Promise<boolean> {
+  const config = readConfig();
+  if(!config){
+    return false;
   }
-  if (!fs.existsSync(platsPath)){
-    fs.mkdirSync(platsPath);
+  info('detect and install dependencies...');
+  await Promise.all([mkdirIfNotExist(packsPath), mkdirIfNotExist(platsPath)]);
+  const [packs, plats] = await combineDeps();
+  const {refresh:{before,after}} = getPluginBundle();
+  const conti = await before();
+  if(!conti){
+    return false;
   }
-  const plats = await combineDeps();
   await installAction(plats);
   await execa('prettier', ['--write', path.join(rootPath, 'package.json')], {
     cwd: projectPath
   });
+  return after();
 }
 
 async function fullRefreshAction() {
-  await refreshAction();
+  const result = await refreshAction();
+  if(!result){
+    return;
+  }
   success('refresh success');
 }
 
@@ -183,4 +197,10 @@ function commandRefresh(program: Command) {
     .action(fullRefreshAction);
 }
 
-export { commandRefresh, refreshAction, installAction, packageDetect, fullRefreshAction };
+export {
+  commandRefresh,
+  refreshAction,
+  installAction,
+  packageDetect,
+  fullRefreshAction
+};

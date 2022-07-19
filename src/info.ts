@@ -5,11 +5,11 @@ function error(message: string) {
 }
 
 function info(message: string) {
-  console.log(chalk.black.bold(message));
+  console.log(chalk.blue(message));
 }
 
 function log(message:string){
-  console.log(chalk.blue(message));
+  console.log(chalk.black.bold(message));
 }
 
 function success(message: string) {

@@ -1,49 +1,49 @@
 import { Command } from 'commander';
 import execa from 'execa';
 import {
-  readPackageJson,
-  readRootPackageJson,
+  isDirectory,
+  mkdirIfNotExist, readdir,
   rootPath,
-  writeRootPackageJson
 } from '../file';
-import { desc, error, info, success } from '../info';
+import {error, info, log} from '../info';
 import path from 'path';
-import fs from 'fs';
 import inquirer from 'inquirer';
+import {readPackageJson} from "../resource";
 
 const platsPath = path.join(rootPath, 'plats');
 
-function validPlatform(platform: string): boolean {
-  const formDirPath = path.join(platsPath, platform);
-  return fs.existsSync(formDirPath) && fs.statSync(formDirPath).isDirectory();
+function validPlatform(forms:string[],platform: string): boolean {
+  return forms.includes(platform);
 }
 
-function fetchPlatforms() {
+async function fetchPlatforms() {
   const formDirPath = path.join(platsPath);
-  const list = fs.readdirSync(formDirPath);
-  return list.filter(n =>{
-    const isValid = fs.existsSync(path.join(platsPath, n, 'pmnp.plat.json'));
-    if (!isValid) {
-      return false;
+  const list = await readdir(formDirPath);
+  const fetchers = list.map(async (n):Promise<[string,boolean]>=>{
+    const isDir = await isDirectory(path.join(platsPath, n));
+    if(!isDir){
+      return [n,false];
     }
-    const json =
-        readPackageJson(path.join(platsPath, n, 'package.json'), true) || {};
-    const { scripts = {} } = json;
-    return !!scripts.start;
-  });
+    const json = await readPackageJson(path.join(platsPath, n, 'package.json'));
+    if(!json){
+      return [n,false];
+    }
+    const {scripts={}} = json;
+    return [n,!!scripts.start];
+  })
+  const listEntries = await Promise.all(fetchers);
+  return listEntries.filter(([,v])=>v).map(([n])=>n);
 }
 
-async function startAction({ plat: startPlat }: { plat?: string }|undefined = {}) {
-  if(!fs.existsSync(platsPath)){
-    fs.mkdirSync(platsPath);
-  }
+async function startAction({ name: startPlat }: { name?: string }|undefined = {}) {
   let platform = startPlat;
-  const forms = fetchPlatforms();
+  await mkdirIfNotExist(platsPath);
+  const forms = await fetchPlatforms();
   if (!forms.length) {
     error('Please create a platform first.');
     return;
   }
-  if (!platform || !validPlatform(platform)) {
+  if (!platform || !validPlatform(forms,platform)) {
     const { plat } = await inquirer.prompt([
       {
         name: 'plat',
@@ -73,7 +73,7 @@ function commandStart(program: Command) {
   program
     .command('start')
     .description('start `platform` for development.')
-    .option('-p, --plat <char>', 'Enter the platform for development')
+    .option('-n, --name <char>', 'Enter the platform for development')
     .action(startAction);
 }
 

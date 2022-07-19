@@ -10,11 +10,12 @@ import { commandPlat, platAction } from './commands/plat';
 import { commandStart, startAction } from './commands/start';
 import { buildAction, commandBuild } from './commands/build';
 import execa from 'execa';
-import { desc, error } from './info';
+import { desc, error, log } from './info';
 import { commandTemplate, templateAction } from './commands/template';
-import { readConfig } from './file';
 import inquirer from 'inquirer';
 import { commandConfig, configAction } from './commands/config';
+import { readConfig, readConfigAsync } from './root';
+import {usePlugins} from "./plugins";
 
 const actions: Record<string, (...args: any[]) => Promise<any>> = {
   start: startAction,
@@ -32,7 +33,7 @@ function defineCommander() {
     .description('This is a tool to build monorepo platforms.')
     .version('1.1.0')
     .action(async () => {
-      const rootConfig = readConfig(true);
+      const rootConfig = readConfig();
       if (!rootConfig) {
         await initialAction();
         return;
@@ -46,8 +47,8 @@ function defineCommander() {
             'start',
             'refresh',
             'config',
-            'pack',
-            'plat',
+            'package',
+            'platform',
             'template',
             'build'
           ],
@@ -85,8 +86,7 @@ function versionCheck(current: string, limit: [number, number, number]) {
   return result >= 0;
 }
 
-function nodeSupport() {
-  const { stdout } = execa.sync('node', ['-v']);
+function nodeSupport(stdout: string) {
   const validVersions = [16, 7, 0] as [number, number, number];
   return versionCheck(
     stdout.startsWith('v') ? stdout.slice(1) : stdout,
@@ -94,8 +94,7 @@ function nodeSupport() {
   );
 }
 
-function npmSupport() {
-  const { stdout } = execa.sync('npm', ['-v']);
+function npmSupport(stdout: string) {
   const validVersions = [7, 7, 0] as [number, number, number];
   return versionCheck(
     stdout.startsWith('v') ? stdout.slice(1) : stdout,
@@ -103,16 +102,25 @@ function npmSupport() {
   );
 }
 
-function startup() {
-  defineCommander();
-  if (!nodeSupport()) {
+async function startup() {
+  desc('initial pmnps...');
+  const [nodeV, npmV,config] = await Promise.all([
+    execa('node', ['-v']),
+    execa('npm', ['-v']),
+    readConfigAsync()
+  ]);
+  if (!nodeSupport(nodeV.stdout)) {
     error('The nodejs version should >= 16.7.0');
     return;
   }
-  if (!npmSupport()) {
+  if (!npmSupport(npmV.stdout)) {
     error('The npm version should >= 7.7.0');
     return;
   }
+  if(config){
+    usePlugins(config);
+  }
+  defineCommander();
   commandInitial(program);
   commandRefresh(program);
   commandPack(program);

@@ -1,34 +1,15 @@
-const jsFormat = 0b00000001;
-
-const jsxFormat = 0b00000011;
-
-const tsFormat = 0b00000100;
-
-const tsxFormat = 0b00000110;
-
-const formatMap = new Map<'js' | 'jsx' | 'ts' | 'tsx', number>([
-  ['js', jsFormat],
-  ['jsx', jsxFormat],
-  ['ts', tsFormat],
-  ['tsx', tsxFormat]
-]);
-
-function selectJsFormat(
-  formats: ('js' | 'jsx' | 'ts' | 'tsx')[]
-): 'js' | 'jsx' | 'ts' | 'tsx' {
-  const result = formats.reduce(
-    (r, format) => (formatMap.get(format) || 0) | r,
-    0
-  );
-  const e: Array<['js' | 'jsx' | 'ts' | 'tsx', number]> = [
-    ...formatMap.entries()
-  ].reverse();
-  const found = e.find(([k, v]) => (v & result) === v);
-  if (!found) {
-    return 'js';
-  }
-  return found[0];
-}
+import fs from 'fs';
+import {
+  createFileIfNotExist, isFile,
+  readFileAsync,
+  readJsonAsync,
+  rootPath,
+  writeFileAsync,
+  writeJsonAsync
+} from './file';
+import path from 'path';
+import {info, log, warn} from './info';
+import {PackageJson, PlatPackageJson, PmnpsConfig} from "./type";
 
 const prettier = {
   semi: true,
@@ -38,8 +19,7 @@ const prettier = {
   arrowParens: 'avoid'
 };
 
-const gitignore =`
-node_modules/
+const gitignore = `node_modules/
 /.idea/
 /.vscode/
 `;
@@ -48,4 +28,102 @@ const basicDevDependencies = {
   prettier: '^2.7.0'
 };
 
-export { selectJsFormat, basicDevDependencies, prettier,gitignore };
+async function readPackageJson<T extends PackageJson|PlatPackageJson>(locationPath: string):Promise<undefined|T> {
+  const file = await isFile(locationPath);
+  if (!file) {
+    return undefined;
+  }
+  return readJsonAsync<T>(locationPath);
+}
+
+function writePackageJson(
+  locationPath: string,
+  packageJson: Record<string, any>
+) {
+  const { name, ...prev } = packageJson;
+  const end = { name };
+  const source = readPackageJson(locationPath);
+  const content = { ...prev, ...source, ...end };
+  return writeJsonAsync(locationPath, content);
+}
+
+function writePrettier(targetDirPath: string) {
+  return createFileIfNotExist(
+    path.join(targetDirPath, '.prettierrc.json'),
+    JSON.stringify(prettier)
+  );
+}
+
+function writeGitIgnore(targetDirPath: string) {
+  return createFileIfNotExist(
+    path.join(targetDirPath, '.gitignore'),
+    JSON.stringify(gitignore)
+  );
+}
+
+const forbiddenUrl = 'registry=https://forbidden.manual.install';
+
+async function writeForbiddenManualInstall(dirPath: string) {
+  const npmConfigPath = path.join(dirPath, '.npmrc');
+  if (fs.existsSync(npmConfigPath)) {
+    warn('Has detected `.npmrc` file, `npm install` will not be forbidden.');
+    return;
+  }
+  const json = await readPackageJson(dirPath);
+  if (!json) {
+    info('Has forbidden manual `npm install`');
+    return writeFileAsync(npmConfigPath, forbiddenUrl);
+  }
+  const { pmnps = {} } = json as PlatPackageJson;
+  const { ownRoot } = pmnps;
+  if (ownRoot) {
+    info('Has detected `ownRoot` config, `npm install` will not be forbidden.');
+    return;
+  }
+  info('Has forbidden manual `npm install`');
+  return writeFileAsync(npmConfigPath, forbiddenUrl);
+}
+
+async function writeUnForbiddenManualInstall(dirPath: string) {
+  const npmConfigPath = path.join(dirPath, '.npmrc');
+  if (!fs.existsSync(npmConfigPath)) {
+    return;
+  }
+  const data = await readFileAsync(npmConfigPath);
+  if (!data.includes(forbiddenUrl)) {
+    return;
+  }
+  info('Has detected `ownRoot` config, allow manual `npm install`');
+  return writeFileAsync(npmConfigPath, data.replace(forbiddenUrl, ''));
+}
+
+async function readPmnpsConfig(packageJsonPath:string):Promise<PmnpsConfig|undefined>{
+  const json = await readPackageJson<PlatPackageJson>(packageJsonPath);
+  if(!json){
+    return undefined;
+  }
+  const {pmnps} = json;
+  return pmnps as PmnpsConfig|undefined;
+}
+
+async function writePmnpsConfig(packageJsonPath:string,config:PmnpsConfig){
+  const json = await readPackageJson<PlatPackageJson>(packageJsonPath);
+  if(!json){
+    return undefined;
+  }
+  const {pmnps={}} = json;
+  const newJson = {...json,pmnps:{...config,...pmnps}};
+  return writePackageJson(packageJsonPath,newJson);
+}
+
+export {
+  basicDevDependencies,
+  writePrettier,
+  writeGitIgnore,
+  writeForbiddenManualInstall,
+  writeUnForbiddenManualInstall,
+  readPackageJson,
+  writePackageJson,
+  readPmnpsConfig,
+  writePmnpsConfig
+};

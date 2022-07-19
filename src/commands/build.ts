@@ -1,19 +1,13 @@
 import { Command } from 'commander';
 import execa from 'execa';
-import {
-  readConfig,
-  readPackageJson,
-  readPackageJsonAsync,
-  readRootPackageJson,
-  rootPath,
-  writeConfig,
-  writeRootPackageJson
-} from '../file';
-import { desc, error, info, success, warn } from '../info';
+import { isDirectory, mkdirIfNotExist, readdir, rootPath } from '../file';
+import {desc, error, info, log, warn} from '../info';
 import path from 'path';
-import fs from 'fs';
 import inquirer from 'inquirer';
 import { installAction, packageDetect } from './refresh';
+import { readConfig } from '../root';
+import { readPackageJson } from '../resource';
+import { ValidDetectResult } from '@/type';
 
 const platsPath = path.join(rootPath, 'plats');
 
@@ -21,20 +15,24 @@ function validPlatform(forms: string[], platform: string): boolean {
   return forms.includes(platform);
 }
 
-function fetchPlatforms(mode?: string) {
+async function fetchPlatforms(mode?: string) {
   const formDirPath = path.join(platsPath);
-  const list = fs.readdirSync(formDirPath);
+  const list = await readdir(formDirPath);
   const buildKey = mode ? `build-${mode}` : 'build';
-  return list.filter(n => {
-    const isValid = fs.existsSync(path.join(platsPath, n, 'pmnp.plat.json'));
-    if (!isValid) {
-      return false;
+  const fetchers = list.map(async (n): Promise<[string, boolean]> => {
+    const isDir = await isDirectory(path.join(platsPath, n));
+    if (!isDir) {
+      return [n, false];
     }
-    const json =
-      readPackageJson(path.join(platsPath, n, 'package.json'), true) || {};
+    const json = await readPackageJson(path.join(platsPath, n, 'package.json'));
+    if (!json) {
+      return [n, false];
+    }
     const { scripts = {} } = json;
-    return !!scripts[buildKey];
+    return [n, !!scripts[buildKey]];
   });
+  const listEntries = await Promise.all(fetchers);
+  return listEntries.filter(([, v]) => v).map(([n]) => n);
 }
 
 type PlatPackage = {
@@ -101,7 +99,7 @@ async function resortForms(
   form?: string
 ): Promise<Array<PlatPackage[]>> {
   const fetches = formRange.map(n =>
-    readPackageJsonAsync(path.join(platsPath, n, 'package.json'))
+    readPackageJson(path.join(platsPath, n, 'package.json'))
   );
   const allPackages = await Promise.all(fetches);
   const roots = analyzePlatDependencies(allPackages as PlatPackage[]);
@@ -164,6 +162,91 @@ function parseParam(
   return undefined;
 }
 
+async function execBuildSmooth(pf: PlatPackage, mode?: string, param?: string) {
+  const { name, pmnps = {} } = pf;
+  const { buildHook = {} } = pmnps;
+  const { before, after } = buildHook;
+  log(`==================== ${name} ====================`);
+  if (before) {
+    const beforeParam = parseParam(pf, param, 'before') || '';
+    const beforeBufferProcess = execa.command(before + beforeParam, {
+      cwd: path.join(platsPath, name)
+    });
+    // @ts-ignore
+    beforeBufferProcess.stderr.pipe(process.stderr);
+    // @ts-ignore
+    beforeBufferProcess.stdout.pipe(process.stdout);
+    await beforeBufferProcess;
+  }
+  const pam = parseParam(pf, param);
+  const bufferProcess = execa.command(
+    `npm run build${mode ? '-' + mode : ''} ${pam ? '-- ' + pam : ''}`,
+    {
+      cwd: path.join(platsPath, name)
+    }
+  );
+  // @ts-ignore
+  bufferProcess.stderr.pipe(process.stderr);
+  // @ts-ignore
+  bufferProcess.stdout.pipe(process.stdout);
+  await bufferProcess;
+  if (after) {
+    const afterParam = parseParam(pf, param, 'after') || '';
+    const afterBufferProcess = execa.command(after + afterParam, {
+      cwd: path.join(platsPath, name)
+    });
+    // @ts-ignore
+    afterBufferProcess.stderr.pipe(process.stderr);
+    // @ts-ignore
+    afterBufferProcess.stdout.pipe(process.stdout);
+    await afterBufferProcess;
+  }
+}
+
+async function execBuild(pf: PlatPackage, mode?: string, param?: string) {
+  const { name, pmnps = {} } = pf;
+  const { buildHook = {} } = pmnps;
+  const { before, after } = buildHook;
+  let beforeBuffer;
+  let afterBuffer;
+  if (before) {
+    const beforeParam = parseParam(pf, param, 'before') || '';
+    beforeBuffer = await execa.command(before + beforeParam, {
+      cwd: path.join(platsPath, name)
+    });
+  }
+  const pam = parseParam(pf, param);
+  const buffer = await execa.command(
+    `npm run build${mode ? '-' + mode : ''} ${pam ? '-- ' + pam : ''}`,
+    {
+      cwd: path.join(platsPath, name)
+    }
+  );
+  if (after) {
+    const afterParam = parseParam(pf, param, 'after') || '';
+    afterBuffer = await execa.command(after + afterParam, {
+      cwd: path.join(platsPath, name)
+    });
+  }
+  return {
+    beforeBuffer,
+    buffer,
+    afterBuffer
+  };
+}
+
+function logBuffer(buffer: execa.ExecaSyncReturnValue | undefined) {
+  if (!buffer) {
+    return;
+  }
+  const { stdout, stderr } = buffer;
+  if (stderr) {
+    warn(stderr);
+  } else {
+    console.log(stdout);
+  }
+}
+
 async function batchBuild(
   packGroups: PlatPackage[][],
   mode?: string,
@@ -173,48 +256,23 @@ async function batchBuild(
     return;
   }
   const [packs, ...rest] = packGroups;
-  const runners = packs.map(pf => {
-    const { name, pmnps = {} } = pf;
-    const { buildHook = {} } = pmnps;
-    const { before } = buildHook;
-    if (before) {
-      const beforeParam = parseParam(pf, param, 'before') || '';
-      const beforeBuffer = execa.commandSync(before + beforeParam, {
-        cwd: path.join(platsPath, name)
-      });
-      desc(beforeBuffer.stdout);
-      warn(beforeBuffer.stderr);
-    }
-    const pam = parseParam(pf, param);
-    return execa.command(
-      `npm run build${mode ? '-' + mode : ''} ${pam ? '-- ' + pam : ''}`,
-      {
-        cwd: path.join(platsPath, name)
-      }
-    );
-  });
-  const results = await Promise.all(runners);
-  results.forEach((r, i) => {
-    const pf = packs[i];
-    const { name, pmnps = {} } = pf;
-    const { buildHook = {} } = pmnps;
-    const { after } = buildHook;
-    const { stdout, stderr } = r;
-    info(`==================== ${name} ====================`);
-    if (stderr) {
-      warn(stderr);
-    } else {
-      desc(stdout);
-    }
-    if (after) {
-      const afterParam = parseParam(pf, param, 'after') || '';
-      const afterBuffer = execa.commandSync(after + afterParam, {
-        cwd: path.join(platsPath, name)
-      });
-      desc(afterBuffer.stdout);
-      warn(afterBuffer.stderr);
-    }
-  });
+  if (packs.length === 1) {
+    await execBuildSmooth(packs[0], mode, param);
+  } else {
+    const runners = packs.map(pf => {
+      return execBuild(pf, mode, param);
+    });
+    const results = await Promise.all(runners);
+    results.forEach((r, i) => {
+      const { beforeBuffer, buffer, afterBuffer } = r;
+      const pf = packs[i];
+      const { name } = pf;
+      log(`==================== ${name} ====================`);
+      logBuffer(beforeBuffer);
+      logBuffer(buffer);
+      logBuffer(afterBuffer);
+    });
+  }
   if (!rest.length) {
     return;
   }
@@ -233,11 +291,9 @@ async function buildAction({
   if (!rootConfig) {
     return;
   }
-  if(!fs.existsSync(platsPath)){
-    fs.mkdirSync(platsPath);
-  }
   let platform = startPlat;
-  const forms = fetchPlatforms(mode);
+  await mkdirIfNotExist(platsPath);
+  const forms = await fetchPlatforms(mode);
   if (!forms.length) {
     error('Please create a platform first.');
     return;
@@ -266,7 +322,8 @@ async function buildAction({
     const plats = await packageDetect(platsPath);
     await installAction(
       plats.filter(
-        ({ packageJson }) => packageJson && platNameSet.has(packageJson.name)
+        (d): d is ValidDetectResult<PlatPackage> =>
+          !!d.packageJson && platNameSet.has(d.packageJson.name)
       )
     );
   }

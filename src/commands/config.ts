@@ -1,18 +1,10 @@
 import { Command } from 'commander';
-import execa from 'execa';
-import {
-  readConfig,
-  readPackageJson,
-  readRootPackageJson,
-  rootPath,
-  writeConfig,
-  writeRootPackageJson
-} from '../file';
-import { desc, error, success, warn } from '../info';
+import { rootPath } from '../file';
+import { success } from '../info';
 import path from 'path';
-import fs from 'fs';
 import inquirer from 'inquirer';
 import { refreshAction } from './refresh';
+import { flushConfig, readConfig, writeConfig } from '../root';
 
 const projectPath = rootPath;
 
@@ -32,7 +24,7 @@ const configOptionMap = new Map([
   ['rename workspace', RENAME],
   ['config git', RE_GIT],
   ['add build mode', ADD_BUILD_MODE],
-  ['lock/unlock', LOCK_OR_UNLOCK],
+  ['lock/unlock', LOCK_OR_UNLOCK]
 ]);
 
 async function configAction() {
@@ -40,7 +32,7 @@ async function configAction() {
   if (!rootConfig) {
     return;
   }
-  let { workspace, git, buildModes,lock } = rootConfig;
+  let { workspace, git, buildModes, lock } = rootConfig;
   const { configs } = await inquirer.prompt([
     {
       name: 'configs',
@@ -82,7 +74,7 @@ async function configAction() {
     const set = new Set([...(buildModes || []), buildMode]);
     buildModes = [...set];
   }
-  if((code & LOCK_OR_UNLOCK) === LOCK_OR_UNLOCK){
+  if ((code & LOCK_OR_UNLOCK) === LOCK_OR_UNLOCK) {
     const { lock: l } = await inquirer.prompt([
       {
         name: 'lock',
@@ -90,10 +82,13 @@ async function configAction() {
         message: `Do you want to ${lock ? 'unlock' : 'lock'} pmnps config?`
       }
     ]);
-    lock = l?!lock:lock;
+    lock = l ? !lock : lock;
   }
-  writeConfig({ workspace, git, buildModes,lock });
-  await refreshAction();
+  writeConfig({ workspace, git, buildModes, lock });
+  const [result] = await Promise.all([refreshAction(), flushConfig()]);
+  if(!result){
+    return;
+  }
   success('config success');
 }
 

@@ -5,35 +5,40 @@ import {
   createFileIntoDirIfNotExist,
   mkdirIfNotExist,
   rootPath,
-  writePackageJson,
-  writeTsConfig,
-  copyResource,
-  readConfig,
-  writeConfig,
   copyFolder,
-  writeForbiddenManualInstall
+  writeJsonAsync,
+  isFile,
+  readdir,
+  isDirectory,
+  readJsonAsync,
+  unlink
 } from '../file';
 import path from 'path';
-import { basicDevDependencies, selectJsFormat } from '../resource';
+import {
+  basicDevDependencies,
+  readPackageJson,
+  writeForbiddenManualInstall,
+  writePackageJson,
+  writePrettier
+} from '../resource';
 import fs from 'fs';
-import { Config, PackConfig, TemplateConfig } from '../type';
+import { Config } from '../type';
 import { refreshAction } from './refresh';
-import { error, log, success, warn } from '../info';
-
-const configName = 'pmnp.plat.json';
+import {info, log, success, warn} from '../info';
+import { readConfig } from '../root';
 
 const platsPath = path.join(rootPath, 'plats');
 
-function createPlatPackageJson(
+async function createPlatPackageJson(
   name: string,
   fileEnd: string,
+  useReact: boolean,
   rootConfig: Config
 ) {
   const isTs = fileEnd.startsWith('ts');
-  const isReact = fileEnd.endsWith('x');
   const packageJsonPath = path.join(platsPath, name, 'package.json');
   const tsDep = isTs ? { typescript: '4.5.5' } : {};
-  const reactDep = isReact
+  const reactDep = useReact
     ? {
         react: '16.14.0',
         'react-dom': '16.14.0'
@@ -60,16 +65,19 @@ function createPlatPackageJson(
       ...tsDep
     }
   };
-  writePackageJson(packageJsonPath, json);
+  return writePackageJson(packageJsonPath, json);
 }
 
-function createTsConfig(name: string, fileEnd: 'ts' | 'tsx' | 'js' | 'jsx') {
+async function createTsConfig(
+  name: string,
+  fileEnd: 'ts' | 'tsx' | 'js' | 'jsx',
+  useReact: boolean
+) {
   const packRootPath = path.join(platsPath, name);
   const noTsConfig = fileEnd.startsWith('j');
   if (noTsConfig) {
     return;
   }
-  const usingReact = fileEnd.endsWith('x');
   const compilerOptions = {
     target: 'esnext',
     module: 'esnext',
@@ -92,35 +100,20 @@ function createTsConfig(name: string, fileEnd: 'ts' | 'tsx' | 'js' | 'jsx') {
     emitDecoratorMetadata: true
   };
   const tsConfig = {
-    compilerOptions: usingReact
+    compilerOptions: useReact
       ? { ...compilerOptions, jsx: 'react' }
       : compilerOptions,
     exclude: ['node_modules']
   };
-  writeTsConfig(path.join(packRootPath, 'tsconfig.json'), tsConfig);
-}
-
-function readPlatConfig(name: string) {
-  if (!fs.existsSync(path.join(platsPath, name, configName))) {
-    return undefined;
+  const tsPath = path.join(packRootPath, 'tsconfig.json');
+  const file = await isFile(tsPath);
+  if (file) {
+    return;
   }
-  const content = fs.readFileSync(path.join(platsPath, name, configName));
-  const data = JSON.parse(content.toString('utf-8'));
-  return data as PackConfig;
+  return writeJsonAsync(tsPath, tsConfig);
 }
 
-function writePlatConfig(
-  name: string,
-  jsFormats: ('ts' | 'tsx' | 'js' | 'jsx')[]
-) {
-  const config = { name, jsFormats };
-  fs.writeFileSync(
-    path.join(platsPath, name, configName),
-    JSON.stringify(config)
-  );
-}
-
-function readTemplates(): string[] {
+async function readTemplates(): Promise<string[]> {
   const templatesPath = path.join(rootPath, 'templates');
   if (
     !fs.existsSync(templatesPath) ||
@@ -128,21 +121,23 @@ function readTemplates(): string[] {
   ) {
     return [];
   }
-  const list = fs.readdirSync(templatesPath);
-  return list.filter(d => {
+  const list = await readdir(templatesPath);
+  const fetchers = list.map(async (d): Promise<[string, boolean]> => {
     const detailPath = path.join(templatesPath, d);
     const detailConfigPath = path.join(detailPath, 'pmnps.template.json');
-    if (
-      !fs.existsSync(detailPath) ||
-      !fs.statSync(detailPath).isDirectory() ||
-      !fs.existsSync(detailConfigPath)
-    ) {
-      return false;
+    const [dir, file] = await Promise.all([
+      isDirectory(detailPath),
+      isFile(detailConfigPath)
+    ]);
+    if (!dir || !file) {
+      return [d, false];
     }
-    const buffer = fs.readFileSync(detailConfigPath);
-    const { type } = JSON.parse(buffer.toString('utf-8')) as TemplateConfig;
-    return type === 'platform';
+    const { type } = await readJsonAsync(detailConfigPath);
+    return [d, type === 'platform'];
   });
+  const listEntries = await Promise.all(fetchers);
+  const validListEntries = listEntries.filter(([, v]) => v);
+  return validListEntries.map(([d]) => d);
 }
 
 async function copyProject(name: string, tempName: string) {
@@ -150,13 +145,15 @@ async function copyProject(name: string, tempName: string) {
     path.join(rootPath, 'templates', tempName),
     path.join(platsPath, name)
   );
-  writePackageJson(path.join(platsPath, name, 'package.json'), { name });
-  fs.unlinkSync(path.join(platsPath, name, 'pmnps.template.json'));
+  return Promise.all([
+    writePackageJson(path.join(platsPath, name, 'package.json'), { name }),
+    unlink(path.join(platsPath, name, 'pmnps.template.json'))
+  ]);
 }
 
 async function copyTemplate(name: string): Promise<boolean> {
   let useTemplate = false;
-  const templates = readTemplates();
+  const templates = await readTemplates();
   if (templates.length) {
     const { useTemp } = await inquirer.prompt([
       {
@@ -188,21 +185,24 @@ async function copyTemplate(name: string): Promise<boolean> {
   return false;
 }
 
-function createPlat(
+async function createPlat(
   name: string,
-  formats: ('ts' | 'tsx' | 'js' | 'jsx')[],
+  fileEnd: 'ts' | 'tsx' | 'js' | 'jsx',
+  useReact: boolean,
   rootConfig: Config
 ) {
-  mkdirIfNotExist(path.join(platsPath, name));
-  mkdirIfNotExist(path.join(platsPath, name, 'src'));
-  const fileEnd = selectJsFormat(formats);
-  createFileIntoDirIfNotExist(
+  await mkdirIfNotExist(path.join(platsPath, name));
+  await Promise.all([
+    mkdirIfNotExist(path.join(platsPath, name, 'src')),
+    createPlatPackageJson(name, fileEnd, useReact, rootConfig),
+    createTsConfig(name, fileEnd, useReact),
+    writePrettier(path.join(platsPath, name))
+  ]);
+  return createFileIntoDirIfNotExist(
     path.join(platsPath, name, 'src'),
     `index.${fileEnd}`,
     ['ts', 'tsx', 'js', 'jsx']
   );
-  createPlatPackageJson(name, fileEnd, rootConfig);
-  createTsConfig(name, fileEnd);
 }
 
 async function prettierProject(name: string, isNew: boolean) {
@@ -215,8 +215,7 @@ async function prettierProject(name: string, isNew: boolean) {
       'prettier',
       [
         '--write',
-        path.join(platsPath, name, 'package.json'),
-        path.join(platsPath, name, configName)
+        path.join(platsPath, name, 'package.json')
       ],
       {
         cwd: rootPath
@@ -233,14 +232,47 @@ async function gitAddition(name: string, git?: boolean): Promise<void> {
   }
 }
 
+async function createPlatAction(name:string,rootConfig:Config){
+  const { format: ft } = await inquirer.prompt([
+    {
+      name: 'format',
+      type: 'list',
+      message: 'Select code formats:',
+      choices: ['ts', 'tsx', 'js', 'jsx']
+    }
+  ]);
+  const format = ft || 'js';
+  let useReact = false;
+  if (format && format.endsWith('x')) {
+    const { react } = await inquirer.prompt([
+      {
+        name: 'react',
+        type: 'confirm',
+        message:
+            'You have selected a `x` end format, do you want to use `React`?'
+      }
+    ]);
+    useReact = react;
+  }
+  info('config plat...');
+  await createPlat(name, format, useReact, rootConfig);
+}
+
+async function flushPlatAction(name:string,rootConfig:Config,isNew:boolean){
+  const { git } = rootConfig;
+  return Promise.all([
+    refreshAction(),
+    prettierProject(name, isNew),
+    gitAddition(name, git),
+  ]);
+}
+
 async function platAction({ name: n }: { name?: string } | undefined = {}) {
   const rootConfig = readConfig();
   if (!rootConfig) {
     return;
   }
-  if (!fs.existsSync(platsPath)) {
-    fs.mkdirSync(platsPath);
-  }
+  const mkPlatRooting = mkdirIfNotExist(platsPath);
   let name = n && n.trim() ? n.trim() : null;
   if (!name) {
     const { name: nm } = await inquirer.prompt([
@@ -256,43 +288,31 @@ async function platAction({ name: n }: { name?: string } | undefined = {}) {
     warn('The name of platform should not be null');
     return;
   }
-  const config = readPlatConfig(name);
+  const [config] = await Promise.all([
+    readPackageJson(path.join(platsPath, name, 'package.json')),
+    mkPlatRooting
+  ]);
   const copied = await copyTemplate(name);
-  let formats = config ? config.jsFormats : null;
   if (!copied && !config) {
-    const { formats: f } = await inquirer.prompt([
-      {
-        name: 'formats',
-        type: 'checkbox',
-        message: 'Choice code formats:',
-        choices: ['ts', 'tsx', 'js', 'jsx']
-      }
-    ]);
-    formats = f;
-    log('config plat...');
-    createPlat(name, formats || ['js'], rootConfig);
-    const fileEnd = selectJsFormat(formats!);
-    if (fileEnd.startsWith('ts')) {
-      copyResource(path.join(platsPath, name));
-    }
+    await createPlatAction(name,rootConfig);
   } else {
-    log('config plat...');
+    info('config plat...');
   }
-  writePlatConfig(name, formats || ['js']);
   await writeForbiddenManualInstall(path.join(platsPath, name));
-  const { git } = rootConfig;
   const isNew = !config;
-  await Promise.all([prettierProject(name, isNew), gitAddition(name, git)]);
-  await refreshAction();
+  const [result] = await flushPlatAction(name,rootConfig,isNew);
+  if(!result){
+    return;
+  }
   success(`create platform "${name}" success`);
 }
 
 function commandPlat(program: Command) {
   program
-    .command('plat')
+    .command('platform')
     .description('Create a platform, and add into `plats` folder')
     .option('-n, --name <char>', 'Define the platform name you want to create.')
     .action(platAction);
 }
 
-export { commandPlat, platAction };
+export { commandPlat, platAction,createPlatAction,flushPlatAction };

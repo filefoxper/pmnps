@@ -5,30 +5,39 @@ import {
   createFileIntoDirIfNotExist,
   mkdirIfNotExist,
   rootPath,
-  writePackageJson,
-  writeTsConfig,
-  copyResource,
-  readConfig,
-  writeConfig,
-  copyFolder, writeForbiddenManualInstall
+  copyFolder,
+  writeJsonAsync,
+  readdir,
+  isDirectory,
+  isFile,
+  readJsonAsync,
+  unlink
 } from '../file';
 import path from 'path';
-import { basicDevDependencies, selectJsFormat } from '../resource';
+import {
+  basicDevDependencies, readPackageJson,
+  readPmnpsConfig,
+  writeForbiddenManualInstall,
+  writePackageJson,
+  writePmnpsConfig,
+  writePrettier
+} from '../resource';
 import fs from 'fs';
-import { Config, PackConfig, TemplateConfig } from '../type';
 import { refreshAction } from './refresh';
-import { log, success, warn } from '../info';
-
-const configName = 'pmnp.pack.json';
+import {info, log, success, warn} from '../info';
+import { readConfig } from '../root';
 
 const packsPath = path.join(rootPath, 'packages');
 
-function createPackPackageJson(name: string, fileEnd: string) {
+function createPackPackageJson(
+  name: string,
+  fileEnd: string,
+  useReact: boolean
+) {
   const isTs = fileEnd.startsWith('ts');
-  const isReact = fileEnd.endsWith('x');
   const packageJsonPath = path.join(packsPath, name, 'package.json');
   const tsDep = isTs ? { typescript: '4.5.5' } : {};
-  const reactDep = isReact
+  const reactDep = useReact
     ? {
         react: '16.14.0',
         'react-dom': '16.14.0'
@@ -47,16 +56,19 @@ function createPackPackageJson(name: string, fileEnd: string) {
       ...tsDep
     }
   };
-  writePackageJson(packageJsonPath, json);
+  return writePackageJson(packageJsonPath, json);
 }
 
-function createTsConfig(name: string, fileEnd: 'ts' | 'tsx' | 'js' | 'jsx') {
+async function createTsConfig(
+  name: string,
+  fileEnd: 'ts' | 'tsx' | 'js' | 'jsx',
+  useReact: boolean
+) {
   const packRootPath = path.join(packsPath, name);
   const noTsConfig = fileEnd.startsWith('j');
   if (noTsConfig) {
     return;
   }
-  const usingReact = fileEnd.endsWith('x');
   const compilerOptions = {
     target: 'esnext',
     module: 'esnext',
@@ -79,35 +91,20 @@ function createTsConfig(name: string, fileEnd: 'ts' | 'tsx' | 'js' | 'jsx') {
     emitDecoratorMetadata: true
   };
   const tsConfig = {
-    compilerOptions: usingReact
+    compilerOptions: useReact
       ? { ...compilerOptions, jsx: 'react' }
       : compilerOptions,
     exclude: ['node_modules']
   };
-  writeTsConfig(path.join(packRootPath, 'tsconfig.json'), tsConfig);
-}
-
-function readPackConfig(name: string) {
-  if (!fs.existsSync(path.join(packsPath, name, configName))) {
-    return undefined;
+  const tsPath = path.join(packRootPath, 'tsconfig.json');
+  const file = await isFile(tsPath);
+  if (file) {
+    return;
   }
-  const content = fs.readFileSync(path.join(packsPath, name, configName));
-  const data = JSON.parse(content.toString('utf-8'));
-  return data as PackConfig;
+  return writeJsonAsync(tsPath, tsConfig);
 }
 
-function writePackConfig(
-  name: string,
-  jsFormats: ('ts' | 'tsx' | 'js' | 'jsx')[]
-) {
-  const config = { name, jsFormats };
-  fs.writeFileSync(
-    path.join(packsPath, name, configName),
-    JSON.stringify(config)
-  );
-}
-
-function readTemplates(): string[] {
+async function readTemplates(): Promise<string[]> {
   const templatesPath = path.join(rootPath, 'templates');
   if (
     !fs.existsSync(templatesPath) ||
@@ -115,21 +112,23 @@ function readTemplates(): string[] {
   ) {
     return [];
   }
-  const list = fs.readdirSync(templatesPath);
-  return list.filter(d => {
+  const list = await readdir(templatesPath);
+  const fetchers = list.map(async (d): Promise<[string, boolean]> => {
     const detailPath = path.join(templatesPath, d);
     const detailConfigPath = path.join(detailPath, 'pmnps.template.json');
-    if (
-      !fs.existsSync(detailPath) ||
-      !fs.statSync(detailPath).isDirectory() ||
-      !fs.existsSync(detailConfigPath)
-    ) {
-      return false;
+    const [dir, file] = await Promise.all([
+      isDirectory(detailPath),
+      isFile(detailConfigPath)
+    ]);
+    if (!dir || !file) {
+      return [d, false];
     }
-    const buffer = fs.readFileSync(detailConfigPath);
-    const { type } = JSON.parse(buffer.toString('utf-8')) as TemplateConfig;
-    return type === 'package';
+    const { type } = await readJsonAsync(detailConfigPath);
+    return [d, type === 'package'];
   });
+  const listEntries = await Promise.all(fetchers);
+  const validListEntries = listEntries.filter(([, v]) => v);
+  return validListEntries.map(([d]) => d);
 }
 
 async function copyProject(name: string, tempName: string) {
@@ -137,13 +136,15 @@ async function copyProject(name: string, tempName: string) {
     path.join(rootPath, 'templates', tempName),
     path.join(packsPath, name)
   );
-  writePackageJson(path.join(packsPath, name, 'package.json'), { name });
-  fs.unlinkSync(path.join(packsPath, name, 'pmnps.template.json'));
+  return Promise.all([
+    writePackageJson(path.join(packsPath, name, 'package.json'), { name }),
+    unlink(path.join(packsPath, name, 'pmnps.template.json'))
+  ]);
 }
 
 async function copyTemplate(name: string): Promise<boolean> {
   let useTemplate = false;
-  const templates = readTemplates();
+  const templates = await readTemplates();
   if (templates.length) {
     const { useTemp } = await inquirer.prompt([
       {
@@ -175,18 +176,23 @@ async function copyTemplate(name: string): Promise<boolean> {
   return false;
 }
 
-function createPack(name: string, formats: ('ts' | 'tsx' | 'js' | 'jsx')[]) {
-  mkdirIfNotExist(path.join(packsPath, name));
-  mkdirIfNotExist(path.join(packsPath, name, 'src'));
-  const fileEnd = selectJsFormat(formats);
-  createFileIntoDirIfNotExist(path.join(packsPath, name), `index.${fileEnd}`, [
-    'ts',
-    'tsx',
-    'js',
-    'jsx'
+async function createPack(
+  name: string,
+  fileEnd: 'ts' | 'tsx' | 'js' | 'jsx',
+  useReact: boolean
+) {
+  await mkdirIfNotExist(path.join(packsPath, name));
+  return Promise.all([
+    mkdirIfNotExist(path.join(packsPath, name, 'src')),
+    createFileIntoDirIfNotExist(
+      path.join(packsPath, name),
+      `index.${fileEnd}`,
+      ['ts', 'tsx', 'js', 'jsx']
+    ),
+    createPackPackageJson(name, fileEnd, useReact),
+    createTsConfig(name, fileEnd, useReact),
+    writePrettier(path.join(packsPath, name))
   ]);
-  createPackPackageJson(name, fileEnd);
-  createTsConfig(name, fileEnd);
 }
 
 async function prettierProject(name: string, isNew: boolean) {
@@ -199,8 +205,7 @@ async function prettierProject(name: string, isNew: boolean) {
       'prettier',
       [
         '--write',
-        path.join(packsPath, name, 'package.json'),
-        path.join(packsPath, name, configName)
+        path.join(packsPath, name, 'package.json')
       ],
       {
         cwd: rootPath
@@ -209,10 +214,7 @@ async function prettierProject(name: string, isNew: boolean) {
   }
 }
 
-async function gitAddition(
-  name: string,
-  git?: boolean
-): Promise<void> {
+async function gitAddition(name: string, git?: boolean): Promise<void> {
   if (git) {
     await execa('git', ['add', path.join(packsPath, name)], {
       cwd: rootPath
@@ -225,9 +227,7 @@ async function packAction({ name: n }: { name?: string } | undefined = {}) {
   if (!rootConfig) {
     return;
   }
-  if (!fs.existsSync(packsPath)){
-    fs.mkdirSync(packsPath);
-  }
+  const mkPackRooting = mkdirIfNotExist(packsPath);
   let name = n && n.trim() ? n.trim() : null;
   if (!name) {
     const { name: nm } = await inquirer.prompt([
@@ -243,43 +243,55 @@ async function packAction({ name: n }: { name?: string } | undefined = {}) {
     warn('The name of package should not be null');
     return;
   }
+  const [config] = await Promise.all([
+    readPackageJson(path.join(packsPath, name, 'package.json')),
+    mkPackRooting
+  ]);
   const copied = await copyTemplate(name);
-  const config = readPackConfig(name);
-  let formats = config ? config.jsFormats : null;
   if (!copied && !config) {
-    const { formats: f } = await inquirer.prompt([
+    const { format: ft } = await inquirer.prompt([
       {
-        name: 'formats',
-        type: 'checkbox',
-        message: 'Choice code formats:',
+        name: 'format',
+        type: 'list',
+        message: 'Select code formats:',
         choices: ['ts', 'tsx', 'js', 'jsx']
       }
     ]);
-    formats = f;
-    log('config package...');
-    createPack(name, formats!);
-    const fileEnd = selectJsFormat(formats!);
-    if (fileEnd.startsWith('ts')) {
-      copyResource(path.join(packsPath, name));
+    const format = ft || 'js';
+    let useReact = false;
+    if (format && format.endsWith('x')) {
+      const {react} = await inquirer.prompt([
+        {
+          name: 'react',
+          type: 'confirm',
+          message:
+            'You have selected a `x` end format, do you want to use `React`?'
+        }
+      ]);
+      useReact = react;
     }
+    info('config package...');
+    await createPack(name, format, useReact);
   } else {
-    log('config package...');
+    info('config package...');
   }
   const { git } = rootConfig;
-  writePackConfig(name, formats || ['js']);
   await writeForbiddenManualInstall(path.join(packsPath, name));
   const isNew = !config;
-  await Promise.all([
+  const [result] = await Promise.all([
+    refreshAction(),
     prettierProject(name, isNew),
-    gitAddition(name, git)
+    gitAddition(name, git),
   ]);
-  await refreshAction();
+  if(!result){
+    return;
+  }
   success(`create package "${name}" success`);
 }
 
 function commandPack(program: Command) {
   program
-    .command('pack')
+    .command('package')
     .description('Create a package, and add into `packages` folder')
     .option('-n, --name <char>', 'Define the package name you want to create.')
     .action(packAction);

@@ -1,6 +1,6 @@
 {
   "name": "pmnps",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "main": "bin/pmnps.js",
   "typings": "index.d.ts",
   "author": "Jimmy.Harding",

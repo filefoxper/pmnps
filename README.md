@@ -381,3 +381,7 @@ And before config them, you should add the `plugin` into `devDependencies` in `p
 ### v2.0.1
 
 * smooth the all build process.
+
+### v2.0.2
+
+* modify log name about all build process.

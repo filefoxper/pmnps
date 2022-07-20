@@ -219,6 +219,7 @@ async function execBuild(pf: PlatPackage, mode?: string, param?: string) {
   const { name, pmnps = {} } = pf;
   const { buildHook = {} } = pmnps;
   const { before, after } = buildHook;
+  log(`==================== ${name} ====================`);
   let beforeBuffer;
   let afterBuffer;
   if (before) {
@@ -240,7 +241,6 @@ async function execBuild(pf: PlatPackage, mode?: string, param?: string) {
       cwd: path.join(platsPath, name)
     });
   }
-  log(`==================== ${name} ====================`);
   logBuffer(beforeBuffer);
   logBuffer(buffer);
   logBuffer(afterBuffer);

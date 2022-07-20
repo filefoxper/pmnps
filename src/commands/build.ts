@@ -203,6 +203,18 @@ async function execBuildSmooth(pf: PlatPackage, mode?: string, param?: string) {
   }
 }
 
+function logBuffer(buffer: execa.ExecaSyncReturnValue | undefined) {
+  if (!buffer) {
+    return;
+  }
+  const { stdout, stderr } = buffer;
+  if (stderr) {
+    warn(stderr);
+  } else {
+    console.log(stdout);
+  }
+}
+
 async function execBuild(pf: PlatPackage, mode?: string, param?: string) {
   const { name, pmnps = {} } = pf;
   const { buildHook = {} } = pmnps;
@@ -228,23 +240,10 @@ async function execBuild(pf: PlatPackage, mode?: string, param?: string) {
       cwd: path.join(platsPath, name)
     });
   }
-  return {
-    beforeBuffer,
-    buffer,
-    afterBuffer
-  };
-}
-
-function logBuffer(buffer: execa.ExecaSyncReturnValue | undefined) {
-  if (!buffer) {
-    return;
-  }
-  const { stdout, stderr } = buffer;
-  if (stderr) {
-    warn(stderr);
-  } else {
-    console.log(stdout);
-  }
+  log(`==================== ${name} ====================`);
+  logBuffer(beforeBuffer);
+  logBuffer(buffer);
+  logBuffer(afterBuffer);
 }
 
 async function batchBuild(
@@ -262,16 +261,7 @@ async function batchBuild(
     const runners = packs.map(pf => {
       return execBuild(pf, mode, param);
     });
-    const results = await Promise.all(runners);
-    results.forEach((r, i) => {
-      const { beforeBuffer, buffer, afterBuffer } = r;
-      const pf = packs[i];
-      const { name } = pf;
-      log(`==================== ${name} ====================`);
-      logBuffer(beforeBuffer);
-      logBuffer(buffer);
-      logBuffer(afterBuffer);
-    });
+    await Promise.all(runners);
   }
   if (!rest.length) {
     return;

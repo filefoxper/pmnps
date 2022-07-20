@@ -369,9 +369,15 @@ And before config them, you should add the `plugin` into `devDependencies` in `p
 
 ## update
 
+### v2.0.0
+
 * `start -p` changes to `start -n`
 * `pack` command changes to `package` command
 * `plat` command changes to `platform` command
 * The root config `pmnps.config.json` changes to `.pmnpsrc.json`
 * `pmnps.pack.json` & `pmnps.plat.json` is deprecated
 * add simple plugin system.
+
+### v2.0.1
+
+* smooth the all build process.

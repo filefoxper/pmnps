@@ -360,3 +360,7 @@ plugin 插件系统是自 `pmnps@2.0.0` 加入的，我们可以通过配置 `.p
 * `pmnps.config.json` 文件更改为 `.pmnpsrc.json`。
 * 包和平台中的 `pmnps.pack.json`、`pmnps.plat.json` 被废止。
 * 添加了简单的插件系统
+
+### v2.0.1
+
+* 使全部编译过程更加平滑

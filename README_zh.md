@@ -38,7 +38,7 @@ $ pmnps initial
   - packages
   - plats
   package.json
-  pmnps.json
+  .pmnpsrc.json
 ```
 
 该命令用于生成基本 `monorepo` 多平台管理项目目录。
@@ -372,3 +372,7 @@ plugin 插件系统是自 `pmnps@2.0.0` 加入的，我们可以通过配置 `.p
 ### v2.0.3
 
 * 修复全部编译日志错位问题
+
+### v2.0.4
+
+* 支持子路径启动 pmnps 命令，自动向上查找 .pmnpsrc.json 文件。

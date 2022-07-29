@@ -1,7 +1,26 @@
 import fs from 'fs';
 import path from 'path';
 
-const actualRootPath = process.cwd();
+function analyzeRootPath(startPath: string, count: number = 0): string | null {
+  if (!fs.existsSync(startPath)) {
+    return null;
+  }
+  const hasPmnpsConfig = fs.existsSync(path.join(startPath, '.pmnpsrc.json'));
+  if (hasPmnpsConfig) {
+    return startPath;
+  }
+  if(startPath==='/'||startPath.endsWith(':\\')){
+    return null;
+  }
+  if(count===20){
+    return null;
+  }
+  return analyzeRootPath(path.join(startPath, '..'), count + 1);
+}
+
+const startPath = process.cwd();
+
+const actualRootPath = analyzeRootPath(startPath) || startPath;
 
 const rootPath =
   process.env.NODE_ENV === 'development'
@@ -42,7 +61,9 @@ async function mkdirIfNotExist(dirPath: string) {
   }
 }
 
-function readJsonAsync<T extends Record<string, any>>(locationPath: string): Promise<T> {
+function readJsonAsync<T extends Record<string, any>>(
+  locationPath: string
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     fs.readFile(locationPath, (err, data) => {
       if (err) {
@@ -50,7 +71,7 @@ function readJsonAsync<T extends Record<string, any>>(locationPath: string): Pro
         return;
       }
       const content = data.toString('utf-8');
-      if(!content.trim()){
+      if (!content.trim()) {
         resolve({} as T);
         return;
       }
@@ -131,7 +152,7 @@ function copyFolder(sourceDirPath: string, targetDirPath: string) {
 
 function isFile(filePath: string): Promise<boolean> {
   return new Promise((resolve, reject) => {
-    if (!fs.existsSync(filePath)){
+    if (!fs.existsSync(filePath)) {
       resolve(false);
       return;
     }
@@ -147,7 +168,7 @@ function isFile(filePath: string): Promise<boolean> {
 
 function isDirectory(filePath: string): Promise<boolean> {
   return new Promise((resolve, reject) => {
-    if (!fs.existsSync(filePath)){
+    if (!fs.existsSync(filePath)) {
       resolve(false);
       return;
     }

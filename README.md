@@ -42,7 +42,7 @@ after running:
   - packages
   - plats
   package.json
-  pmnps.json
+  .pmnpsrc.json
 ```
 
 This command can create a monorepo project and install the `dependencies & devDependencies` into root `node_modules`.
@@ -389,3 +389,7 @@ And before config them, you should add the `plugin` into `devDependencies` in `p
 ### v2.0.3
 
 * fix all build log at wrong position bug. 
+
+### v2.0.4
+
+* support parent config file finding.

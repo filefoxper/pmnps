@@ -24,10 +24,10 @@ npm install pmnps --save-dev
 
 ## 基本用法
 
-### 使用 initial 命令
+### 使用 pmnps
 
 ```
-$ pmnps initial
+$ pmnps
 ```
 
 生成目录文件如下:
@@ -43,10 +43,12 @@ $ pmnps initial
 
 该命令用于生成基本 `monorepo` 多平台管理项目目录。
 
-### 使用 package 命令
+### 使用 create 命令
+
+#### create package
 
 ```
-$ pmnps package -n test
+$ pmnps create package -n test
 ```
 
 生成目录文件如下:
@@ -64,12 +66,10 @@ $ pmnps package -n test
   .pmnpsrc.json
 ```
 
-该命令用于添加一个 package 平台依赖包，并将依赖安装至根 `node_modules` 目录。
-
-### 使用 platform 命令
+#### create platform
 
 ```
-$ pmnps platform -n web-test
+$ pmnps create platform -n web-test
 ```
 
 生成目录文件如下:
@@ -91,7 +91,7 @@ $ pmnps platform -n web-test
   .pmnpsrc.json
 ```
 
-该命令用于添加一个 platform 平台项目入口，并将依赖安装至根 `node_modules` 目录。
+该命令可用于添加一个 package 平台依赖包或 platform 平台，并将依赖安装至根 `node_modules` 目录。
 
 ### 使用 refresh 命令
 
@@ -183,6 +183,22 @@ $ pmnps build -p "?platA= -i -e <param desc>&platB= -i"
 ```
 $ pmnps config
 ```
+
+选项：
+
+```
+rename workspace              # 重命名 workspace
+active/disable git            # 激活或禁用 git
+lock/unlock                   # 锁定或解锁 pmnps 配置
+package build strict/loose    # 选择 package 创建模式
+private/public project        # 限定 package.json 'private' 字段
+```
+
+关于 package 创建模式的说明：
+
+`loose` 模式创建的 package ，拥有一个直接生成在 package 根目录的 `index` 文件，这便于大多数代码编辑器识别，并可以直接在 platform 平台中无缝关联引用到的 package 中的代码，该模式生成的 package 可将编译任务直接外包给 platform 平台来完成，就像当前包就是平台代码的一部分一样。
+
+`strict` 模式创建的 package 中，`index` 文件是存放在根目录的 `src` 目录下的，与 `loose` 模式不同，它虽然也能被直接关联到 platform 平台中使用，但绝大部分编译器并不能识别，所以往往会出现编译提示爆红，实际却可以正常使用的情况，这就需要 typescript 使用者在完成代码编写任务的同时去完善 `index.d.ts` 文件了。该模式相对 `loose` 模式的好处是，包组织更加规范，在开发过程中可以和 `loose` 模式一样，无缝开发（除了要完善声明文件），但在项目编译时，项目会根据包依赖去编译 `strict` 模式下创建的包。
 
 ### 使用 template 命令
 
@@ -376,3 +392,10 @@ plugin 插件系统是自 `pmnps@2.0.0` 加入的，我们可以通过配置 `.p
 ### v2.0.4
 
 * 支持子路径启动 pmnps 命令，自动向上查找 .pmnpsrc.json 文件。
+
+### v2.1.0
+
+* 废弃 initial 命令
+* package 和 platform 命令合成为 create 命令
+* 去除了全局 build 模式设置项
+* 增加了 package build 模式设置

@@ -17,7 +17,7 @@ import path from 'path';
 import {
   basicDevDependencies,
   readPackageJson,
-  writeForbiddenManualInstall,
+  writeForbiddenManualInstall, writeGitIgnore,
   writePackageJson,
   writePrettier
 } from '../resource';
@@ -44,20 +44,15 @@ async function createPlatPackageJson(
         'react-dom': '16.14.0'
       }
     : {};
-  const { buildModes = [] } = rootConfig;
-  const modeEntries = buildModes.map((mode: string) => [
-    `build-${mode}`,
-    'echo Please edit a build script.'
-  ]);
-  const buildModeScripts = Object.fromEntries(modeEntries);
+  const { private:pri } = rootConfig;
   const json = {
+    private:!!pri,
     name,
     description: 'This is a package in monorepo project',
     version: '1.0.0',
     scripts: {
       start: 'echo Please edit a start script.',
       build: 'echo Please edit a build script.',
-      ...buildModeScripts
     },
     dependencies: reactDep,
     devDependencies: {
@@ -226,6 +221,7 @@ async function prettierProject(name: string, isNew: boolean) {
 
 async function gitAddition(name: string, git?: boolean): Promise<void> {
   if (git) {
+    await writeGitIgnore(path.join(platsPath, name));
     await execa('git', ['add', path.join(platsPath, name)], {
       cwd: rootPath
     });
@@ -307,12 +303,4 @@ async function platAction({ name: n }: { name?: string } | undefined = {}) {
   success(`create platform "${name}" success`);
 }
 
-function commandPlat(program: Command) {
-  program
-    .command('platform')
-    .description('Create a platform, and add into `plats` folder')
-    .option('-n, --name <char>', 'Define the platform name you want to create.')
-    .action(platAction);
-}
-
-export { commandPlat, platAction,createPlatAction,flushPlatAction };
+export { platAction,createPlatAction,flushPlatAction };

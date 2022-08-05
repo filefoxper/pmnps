@@ -1,12 +1,9 @@
 import { program } from 'commander';
-import { commandInitial, initialAction } from './commands/initial';
+import { initialAction } from './commands/initial';
 import {
   commandRefresh,
   fullRefreshAction,
-  refreshAction
 } from './commands/refresh';
-import { commandPack, packAction } from './commands/pack';
-import { commandPlat, platAction } from './commands/plat';
 import { commandStart, startAction } from './commands/start';
 import { buildAction, commandBuild } from './commands/build';
 import execa from 'execa';
@@ -15,13 +12,13 @@ import { commandTemplate, templateAction } from './commands/template';
 import inquirer from 'inquirer';
 import { commandConfig, configAction } from './commands/config';
 import { readConfig, readConfigAsync } from './root';
-import {usePlugins} from "./plugins";
+import { usePlugins } from './plugins';
+import {commandCreate, createAction} from './commands/create.command';
 
 const actions: Record<string, (...args: any[]) => Promise<any>> = {
   start: startAction,
   refresh: fullRefreshAction,
-  pack: packAction,
-  plat: platAction,
+  create:createAction,
   template: templateAction,
   build: buildAction,
   config: configAction
@@ -47,8 +44,7 @@ function defineCommander() {
             'start',
             'refresh',
             'config',
-            'package',
-            'platform',
+            'create',
             'template',
             'build'
           ],
@@ -104,7 +100,7 @@ function npmSupport(stdout: string) {
 
 async function startup() {
   desc('initial pmnps...');
-  const [nodeV, npmV,config] = await Promise.all([
+  const [nodeV, npmV, config] = await Promise.all([
     execa('node', ['-v']),
     execa('npm', ['-v']),
     readConfigAsync()
@@ -117,14 +113,12 @@ async function startup() {
     error('The npm version should >= 7.7.0');
     return;
   }
-  if(config){
+  if (config) {
     usePlugins(config);
   }
   defineCommander();
-  commandInitial(program);
   commandRefresh(program);
-  commandPack(program);
-  commandPlat(program);
+  commandCreate(program);
   commandStart(program);
   commandBuild(program);
   commandTemplate(program);

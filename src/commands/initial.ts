@@ -46,13 +46,26 @@ async function initialAction() {
     writeRootPackageJson(workspace),
     writePrettier(rootPath)
   ]);
-  const { git } = await inquirer.prompt([
+  const { git,strictPackage,private:pri } = await inquirer.prompt([
     {
       name: 'git',
       type: 'confirm',
       message: 'Is that a git project?'
+    },
+    {
+      name:'strictPackage',
+      type:'confirm',
+      message:'Do you want to use strict package build mode? (make package build-able)',
+      default:false
+    },
+    {
+      name:'private',
+      type:'confirm',
+      message:'Is it a private project?',
+      default:true
     }
   ]);
+  writeConfig({strictPackage,private:pri});
   // waiting for git opening operation optimize
   await Promise.all([writing, flushConfig()]);
   if (git) {

@@ -28,10 +28,10 @@ npm install pmnps --save-dev
 
 ## Basic usage
 
-### use initial command
+### use pmnps
 
 ```
-$ pmnps initial
+$ pmnps
 ```
 
 after running:
@@ -47,10 +47,12 @@ after running:
 
 This command can create a monorepo project and install the `dependencies & devDependencies` into root `node_modules`.
 
-### use package command
+### use create command
+
+#### create a package
 
 ```
-$ pmnps package -n test
+$ pmnps create package -n test
 ```
 
 after running:
@@ -68,9 +70,7 @@ after running:
   .pmnpsrc.json
 ```
 
-This command can add a package and install the `dependencies & devDependencies` into root `node_modules`.
-
-### use platform command
+#### create a platform
 
 ```
 $ pmnps platform -n web-test
@@ -95,7 +95,7 @@ after running:
   .pmnpsrc.json
 ```
 
-This command can add a platform and install the dependencies and devDependencies into root `node_modules`.
+This command can add a package or a platform, and install the `dependencies & devDependencies` into root `node_modules`.
 
 ### use refresh command
 
@@ -186,6 +186,20 @@ The `config` command allows you to do more configs. You can open `git usage`, `r
 ```
 $ pmnps config
 ```
+
+options:
+
+```
+rename workspace              # rename the workspace name
+active/disable git            # active or disable git usage
+lock/unlock                   # lock or unlock the config
+package build strict/loose    # the package create mode
+private/public project        # set packages or platforms 'private'
+```
+
+The package build mode `loose`, creates a `index file` directly in the root dir of package, that means you can use this package as a module in your platform project, and it does not need to build alone, you can build the platform directly, just like the package dependence is just a part module in platform.
+
+The package build mode `strict`, creates a `index file` in a `src` dir. If you are using typescript, you may find that almost all the popular code editors can not find the dependency codes from package, but it works well, so, you have to write `index.d.ts` file to resolve this problem. And in this mode, you can build packages and publish it into `npm` manually.
 
 ### use template command
 
@@ -393,3 +407,10 @@ And before config them, you should add the `plugin` into `devDependencies` in `p
 ### v2.0.4
 
 * support parent config file finding.
+
+### v2.1.0
+
+* deprecate the `initial` command.
+* use `create` command to replace the old `package` and `platform` command.
+* deprecate the global `build mode` config
+* add the package build mode.

@@ -1,5 +1,5 @@
 import {Project} from "pmnps-plugin";
-import { rootPath } from './file';
+import {isDirectory, rootPath} from './file';
 import path from 'path';
 import {
   PackageJson,
@@ -12,7 +12,26 @@ const packagePath = path.join(rootPath, 'packages');
 
 const platformPath = path.join(rootPath, 'plats');
 
-function packageDetect(
+function scopeDetect(packageDirPath:string):Promise<(PackageJson|undefined)[]>{
+  const list = fs.readdirSync(packageDirPath);
+  const fetches = list.map(async (name)=>{
+    const dirPath = path.join(packageDirPath, name);
+    const isDir = await isDirectory(dirPath);
+    if(!isDir){
+      return undefined;
+    }
+    const json = await readPackageJson<PackageJson>(
+        path.join(dirPath, 'package.json')
+    );
+    if(json){
+      return json;
+    }
+    return undefined;
+  });
+  return Promise.all(fetches);
+}
+
+async function packageDetect(
   dirPath: string
 ): Promise<(PackageJson | undefined)[]> {
   if (!fs.existsSync(dirPath)) {
@@ -20,16 +39,26 @@ function packageDetect(
   }
   const list = fs.readdirSync(dirPath);
   const fetches = list.map(dirName =>
-    (async function pack() {
+    (async function pack():Promise<PackageJson|undefined|(PackageJson|undefined)[]> {
       const packageDirPath = path.join(dirPath, dirName);
-      return readPackageJson<PackageJson>(
+      const isDir = await isDirectory(packageDirPath);
+      if(!isDir){
+        return undefined;
+      }
+      const json = await readPackageJson<PackageJson>(
         path.join(packageDirPath, 'package.json')
       );
+      if(json){
+        return json;
+      }
+      if(!dirName.startsWith('@')){
+        return undefined;
+      }
+      return scopeDetect(packageDirPath);
     })()
   );
-  return Promise.all(fetches) as Promise<
-    (PackageJson|undefined)[]
-  >;
+  const results = await Promise.all(fetches);
+  return results.flat();
 }
 
 const project: Project = {

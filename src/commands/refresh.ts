@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import execa from 'execa';
-import { mkdirIfNotExist, rootPath } from '../file';
+import { mkdirIfNotExist, readdir, rootPath } from '../file';
 import { desc, error, info, log, success, warn } from '../info';
 import path from 'path';
 import fs from 'fs';
@@ -11,8 +11,8 @@ import {
   PlatPackageJson,
   ValidDetectResult
 } from '../type';
-import {getPluginBundle} from "../plugins";
-import {readConfig} from "../root";
+import { getPluginBundle } from '../plugins';
+import { readConfig } from '../root';
 
 const projectPath = rootPath;
 
@@ -25,13 +25,65 @@ function removeDepPacks(
   packs: string[]
 ): Record<string, any> {
   const packSet = new Set(packs);
+  const scopeList = packs
+    .filter(d => d.startsWith('@'))
+    .map(p => {
+      const [scope] = p.split('/');
+      return `packages/${scope}/*`;
+    });
   const { dependencies } = packageJson;
   const e = Object.entries(dependencies).filter(([k]) => !packSet.has(k));
   const newDep = Object.fromEntries(e);
-  return { ...packageJson, dependencies: newDep };
+  return {
+    ...packageJson,
+    dependencies: newDep,
+    workspaces: [...new Set(['packages/*'].concat(scopeList))]
+  };
 }
 
-function packageDetect<T extends PackageJson | PlatPackageJson>(
+async function packageDetect<T extends PackageJson | PlatPackageJson>(
+  dirPath: string
+): Promise<(ValidDetectResult<T> | InvalidDetectResult)[]> {
+  if (!fs.existsSync(dirPath)) {
+    return [];
+  }
+  const list = fs.readdirSync(dirPath);
+  const scopes = list.filter(d => d.startsWith('@'));
+  const scopeFetches = scopes.map(async dirName => {
+    const packageDirPath = path.join(dirPath, dirName);
+    const subs = await readdir(packageDirPath);
+    const subFetches = subs.map(async s => {
+      const packageJson = await readPackageJson<T>(
+        path.join(packageDirPath, s, 'package.json')
+      );
+      return {
+        packageJson,
+        dirName: `${dirName}/${s}`,
+        dirPath: path.join(packageDirPath, s)
+      };
+    });
+    return Promise.all(subFetches);
+  });
+  const scopePacks = await Promise.all(scopeFetches);
+  const fetches = list
+    .filter(d => !d.startsWith('@'))
+    .map(dirName =>
+      (async function pack() {
+        const packageDirPath = path.join(dirPath, dirName);
+        const packageJson = await readPackageJson<T>(
+          path.join(packageDirPath, 'package.json')
+        );
+        return { packageJson, dirName, dirPath: packageDirPath };
+      })()
+    );
+  const packs = await Promise.all(fetches);
+  return scopePacks.flat().concat(packs) as (
+    | ValidDetectResult<T>
+    | InvalidDetectResult
+  )[];
+}
+
+function platsDetect<T extends PackageJson | PlatPackageJson>(
   dirPath: string
 ): Promise<(ValidDetectResult<T> | InvalidDetectResult)[]> {
   if (!fs.existsSync(dirPath)) {
@@ -64,7 +116,7 @@ async function combineDeps(): Promise<
   const [root, packs, plats] = await Promise.all([
     readPackageJson<PackageJson>(path.join(projectPath, 'package.json')),
     packageDetect<PackageJson>(packsPath),
-    packageDetect<PlatPackageJson>(platsPath)
+    platsDetect<PlatPackageJson>(platsPath)
   ]);
   const packageJson = packs.reduce((data: PackageJson, pack) => {
     const { packageJson } = pack;
@@ -139,14 +191,7 @@ async function installOwnRootPlats(
   return installOwnRootPlats(rest);
 }
 
-async function installAction(plats: ValidDetectResult<PlatPackageJson>[]) {
-  const ownRoots = plats.filter(({ packageJson }) => {
-    if (!packageJson) {
-      return false;
-    }
-    const { pmnps } = packageJson;
-    return pmnps && pmnps.ownRoot;
-  });
+async function installGlobal() {
   log(
     '==================== install project root dependencies ===================='
   );
@@ -158,33 +203,59 @@ async function installAction(plats: ValidDetectResult<PlatPackageJson>[]) {
   // @ts-ignore
   subprocess.stdout.pipe(process.stdout);
   await subprocess;
+}
+
+async function installAction(
+  plats: ValidDetectResult<PlatPackageJson>[],
+  refresh?: boolean
+) {
+  const ownRoots = plats.filter(({ packageJson }) => {
+    if (!packageJson) {
+      return false;
+    }
+    const { pmnps } = packageJson;
+    return pmnps && pmnps.ownRoot;
+  });
+  if (plats.length > ownRoots.length || refresh) {
+    await installGlobal();
+  }
   await installOwnRootPlats(ownRoots);
   return ownRoots;
 }
 
-async function refreshAction():Promise<boolean> {
+async function refreshAction(): Promise<boolean> {
   const config = readConfig();
-  if(!config){
+  if (!config) {
     return false;
   }
   info('detect and install dependencies...');
   await Promise.all([mkdirIfNotExist(packsPath), mkdirIfNotExist(platsPath)]);
   const [packs, plats] = await combineDeps();
-  const {refresh:{before,after}} = getPluginBundle();
+  const {
+    refresh: { before, after }
+  } = getPluginBundle();
   const conti = await before();
-  if(!conti){
+  if (!conti) {
     return false;
   }
-  await installAction(plats);
-  await execa('prettier', ['--write', path.join(rootPath, 'package.json')], {
-    cwd: projectPath
-  });
+  await installAction(plats, true);
+  await execa(
+    'prettier',
+    [
+      '--write',
+      path.join(rootPath, 'package.json'),
+      path.join(rootPath, '.pmnpsrc.json')
+    ],
+    {
+      cwd: projectPath
+    }
+  );
   return after();
 }
 
 async function fullRefreshAction() {
   const result = await refreshAction();
-  if(!result){
+  if (!result) {
     return;
   }
   success('refresh success');

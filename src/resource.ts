@@ -1,6 +1,7 @@
 import fs from 'fs';
 import {
-  createFileIfNotExist, isFile,
+  createFileIfNotExist,
+  isFile,
   readFileAsync,
   readJsonAsync,
   rootPath,
@@ -8,8 +9,8 @@ import {
   writeJsonAsync
 } from './file';
 import path from 'path';
-import {info, log, warn} from './info';
-import {PackageJson, PlatPackageJson, PmnpsConfig} from "./type";
+import { info, log, warn } from './info';
+import { PackageJson, PlatPackageJson, PmnpsConfig } from './type';
 
 const prettier = {
   semi: true,
@@ -22,13 +23,17 @@ const prettier = {
 const gitignore = `node_modules/
 /.idea/
 /.vscode/
+/dist/
+/bin/
 `;
 
 const basicDevDependencies = {
   prettier: '^2.7.0'
 };
 
-async function readPackageJson<T extends PackageJson|PlatPackageJson>(locationPath: string):Promise<undefined|T> {
+async function readPackageJson<T extends PackageJson | PlatPackageJson>(
+  locationPath: string
+): Promise<undefined | T> {
   const file = await isFile(locationPath);
   if (!file) {
     return undefined;
@@ -36,14 +41,22 @@ async function readPackageJson<T extends PackageJson|PlatPackageJson>(locationPa
   return readJsonAsync<T>(locationPath);
 }
 
-function writePackageJson(
+async function writePackageJson(
   locationPath: string,
   packageJson: Record<string, any>
 ) {
-  const { name, ...prev } = packageJson;
-  const end = { name };
-  const source = readPackageJson(locationPath);
-  const content = { ...prev, ...source, ...end };
+  const { name, private: pri, scripts, ...prev } = packageJson;
+  const nameEnd = name ? { name } : {};
+  const privateEnd = pri != null ? { private: pri } : {};
+  const source = await readPackageJson(locationPath);
+  const { scripts: sourceScripts } = source || {};
+  const content = {
+    ...prev,
+    ...source,
+    ...nameEnd,
+    ...privateEnd,
+    scripts: { ...scripts, ...sourceScripts }
+  };
   return writeJsonAsync(locationPath, content);
 }
 
@@ -57,8 +70,12 @@ function writePrettier(targetDirPath: string) {
 function writeGitIgnore(targetDirPath: string) {
   return createFileIfNotExist(
     path.join(targetDirPath, '.gitignore'),
-    JSON.stringify(gitignore)
+    gitignore
   );
+}
+
+function writeBuildContent(dirPath: string) {
+  return createFileIfNotExist(path.join(dirPath, 'index.js'));
 }
 
 const forbiddenUrl = 'registry=https://forbidden.manual.install';
@@ -97,23 +114,25 @@ async function writeUnForbiddenManualInstall(dirPath: string) {
   return writeFileAsync(npmConfigPath, data.replace(forbiddenUrl, ''));
 }
 
-async function readPmnpsConfig(packageJsonPath:string):Promise<PmnpsConfig|undefined>{
+async function readPmnpsConfig(
+  packageJsonPath: string
+): Promise<PmnpsConfig | undefined> {
   const json = await readPackageJson<PlatPackageJson>(packageJsonPath);
-  if(!json){
+  if (!json) {
     return undefined;
   }
-  const {pmnps} = json;
-  return pmnps as PmnpsConfig|undefined;
+  const { pmnps } = json;
+  return pmnps as PmnpsConfig | undefined;
 }
 
-async function writePmnpsConfig(packageJsonPath:string,config:PmnpsConfig){
+async function writePmnpsConfig(packageJsonPath: string, config: PmnpsConfig) {
   const json = await readPackageJson<PlatPackageJson>(packageJsonPath);
-  if(!json){
+  if (!json) {
     return undefined;
   }
-  const {pmnps={}} = json;
-  const newJson = {...json,pmnps:{...config,...pmnps}};
-  return writePackageJson(packageJsonPath,newJson);
+  const { pmnps = {} } = json;
+  const newJson = { ...json, pmnps: { ...config, ...pmnps } };
+  return writePackageJson(packageJsonPath, newJson);
 }
 
 export {
@@ -125,5 +144,6 @@ export {
   readPackageJson,
   writePackageJson,
   readPmnpsConfig,
-  writePmnpsConfig
+  writePmnpsConfig,
+  writeBuildContent
 };

@@ -1,11 +1,12 @@
-import {Plugin,Actions} from 'pmnps-plugin';
+import { Plugin, Actions } from 'pmnps-plugin';
 
 export type Config = {
   workspace: string;
   git?: boolean;
-  buildModes?: string[];
   lock?: boolean;
   plugins?: Plugin[];
+  strictPackage?: boolean;
+  private?:boolean
 };
 
 export type PmnpsConfig = {
@@ -21,6 +22,9 @@ export type PackageJson = {
   version?: string;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
+  deps?: Array<PackageJson>;
+  dets?: Array<PackageJson>;
+  used?: boolean;
 };
 
 export type PlatPackageJson = PackageJson & {
@@ -43,8 +47,8 @@ export type InvalidDetectResult = ValidDetectResult<undefined>;
 export type FullActionHook = {
   before: () => Promise<boolean>;
   after: () => Promise<boolean>;
-}
+};
 
-export type FullPluginResult={
-  [key in Actions]:FullActionHook;
-}
+export type FullPluginResult = {
+  [key in Actions]: FullActionHook;
+};

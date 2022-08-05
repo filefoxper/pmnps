@@ -1,18 +1,69 @@
 import { Command } from 'commander';
 import execa from 'execa';
 import { isDirectory, mkdirIfNotExist, readdir, rootPath } from '../file';
-import {desc, error, info, log, warn} from '../info';
+import { desc, error, info, log, warn } from '../info';
 import path from 'path';
 import inquirer from 'inquirer';
 import { installAction, packageDetect } from './refresh';
 import { readConfig } from '../root';
 import { readPackageJson } from '../resource';
-import { ValidDetectResult } from '@/type';
+import {PackageJson, ValidDetectResult} from '../type';
+
 
 const platsPath = path.join(rootPath, 'plats');
 
+const packagesPath = path.join(rootPath, 'packages');
+
 function validPlatform(forms: string[], platform: string): boolean {
   return forms.includes(platform);
+}
+
+async function fetchPackages(): Promise<PackageJson[]> {
+  const list = await readdir(packagesPath);
+  const scopeFetches = list
+    .filter(d => d.startsWith('@'))
+    .map(async n => {
+      const isDir = await isDirectory(path.join(packagesPath, n));
+      if (!isDir) {
+        return [];
+      }
+      const subs = await readdir(path.join(packagesPath, n));
+      const subFetches = subs.map(
+        async (s): Promise<PackageJson | undefined> => {
+          const isSubDir = await isDirectory(path.join(packagesPath, n, s));
+          if (!isSubDir) {
+            return undefined;
+          }
+          const json = await readPackageJson(
+            path.join(packagesPath, n, s, 'package.json')
+          );
+          if (!json) {
+            return undefined;
+          }
+          return json;
+        }
+      );
+      return Promise.all(subFetches);
+    });
+  const fetches = list
+    .filter(d => !d.startsWith('@'))
+    .map(async (n): Promise<PackageJson | undefined> => {
+      const isDir = await isDirectory(path.join(packagesPath, n));
+      if (!isDir) {
+        return undefined;
+      }
+      const json = await readPackageJson(
+        path.join(packagesPath, n, 'package.json')
+      );
+      if (!json) {
+        return undefined;
+      }
+      return json;
+    });
+  const scopeGroups = await Promise.all(scopeFetches);
+  const scopes = scopeGroups.flat().filter((d): d is PackageJson => !!d);
+  const packs = await Promise.all(fetches);
+  return packs.filter((d): d is PackageJson => !!d).concat(scopes);
 }
 
 async function fetchPlatforms(mode?: string) {
@@ -43,6 +94,8 @@ type PlatPackage = {
     alias?: string;
     buildHook?: { before?: string; after?: string };
   };
+  dependencies: Record<string, any>;
+  devDependencies: Record<string, any>;
   deps: PlatPackage[];
   dets: PlatPackage[];
   level: number;
@@ -68,7 +121,7 @@ function analyzePlatDependencies(packages: PlatPackage[]) {
   return packages.filter(({ deps }) => !deps || !deps.length);
 }
 
-function computeTasks(packs: PlatPackage[]): PlatPackage[][] {
+function computeTasks<T extends { dets?: T[] }>(packs: T[]): T[][] {
   const currents = packs;
   const detSet = new Set(packs.flatMap(({ dets }) => dets || []));
   const dets = [...detSet];
@@ -166,7 +219,7 @@ async function execBuildSmooth(pf: PlatPackage, mode?: string, param?: string) {
   const { name, pmnps = {} } = pf;
   const { buildHook = {} } = pmnps;
   const { before, after } = buildHook;
-  log(`==================== ${name} ====================`);
+  log(`==================== platform ${name} ====================`);
   if (before) {
     const beforeParam = parseParam(pf, param, 'before') || '';
     const beforeBufferProcess = execa.command(before + beforeParam, {
@@ -240,7 +293,7 @@ async function execBuild(pf: PlatPackage, mode?: string, param?: string) {
       cwd: path.join(platsPath, name)
     });
   }
-  log(`==================== ${name} ====================`);
+  log(`==================== platform ${name} ====================`);
   logBuffer(beforeBuffer);
   logBuffer(buffer);
   logBuffer(afterBuffer);
@@ -269,6 +322,78 @@ async function batchBuild(
   return batchBuild(rest, mode, param);
 }
 
+function analyzePrimaryPackagesFromPlatforms(
+  packs: Array<PackageJson>,
+  plats: Array<PlatPackage[]>
+): Array<PackageJson> {
+  const depSet = plats
+    .flat()
+    .reduce((plat, { dependencies, devDependencies }) => {
+      return { ...plat, ...dependencies, ...devDependencies };
+    }, {} as Record<string, any>);
+  return packs.filter(({ name }) => depSet[name]);
+}
+
+function markPackage(
+  range: Array<PackageJson>,
+  packs: Array<PackageJson>
+): Array<PackageJson> {
+  const rangeMap = new Map<string, PackageJson>(range.map(p => [p.name, p]));
+  packs.forEach(p => {
+    const { dependencies, devDependencies } = p;
+    const allDeps = { ...dependencies, ...devDependencies };
+    const deps = Object.keys(allDeps)
+      .map(n => rangeMap.get(n))
+      .filter((pa): pa is PackageJson => !!pa);
+    p.deps = deps;
+    p.used = true;
+    deps.forEach(sourcePack => {
+      const dets = sourcePack.dets || [];
+      sourcePack.used = true;
+      sourcePack.dets = [...new Set([...dets, p])];
+    });
+  });
+  return range.filter(({ used }) => used);
+}
+
+async function buildPackageTask(tasks: PackageJson[][]) {
+  if (!tasks.length) {
+    return;
+  }
+  const [task, ...rest] = tasks;
+  const buildAbles = task.filter(({ scripts }) => scripts && scripts.build);
+  const builds = buildAbles.map(async pack => {
+    const { name } = pack;
+    const parts = name.split('/');
+    return execa.command('npm run build', {
+      cwd: path.join(packagesPath, ...parts)
+    });
+  });
+  const results = await Promise.all(builds);
+  results.forEach((buffer,index) => {
+    const {name} = buildAbles[index];
+    log(`==================== package ${name} ====================`);
+    logBuffer(buffer);
+  });
+  if (!rest.length) {
+    return;
+  }
+  await buildPackageTask(rest);
+}
+
+async function batchBuildPackages(
+  range: Array<PackageJson>,
+  packs: Array<PackageJson>
+) {
+  if (!range.length || !packs.length) {
+    return;
+  }
+  const marked = markPackage(range, packs);
+  const roots = marked.filter(({ deps }) => !deps || !deps.length);
+  const tasks = computeTasks(roots);
+  return buildPackageTask(tasks);
+}
+
 async function buildAction({
   name: startPlat,
   mode,
@@ -283,9 +408,16 @@ async function buildAction({
   }
   let platform = startPlat;
   await mkdirIfNotExist(platsPath);
-  const forms = await fetchPlatforms(mode);
+  const [forms, packs] = await Promise.all([
+    fetchPlatforms(mode),
+    fetchPackages()
+  ]);
+  if (!forms.length && !packs.length) {
+    error('Please create a platform or package first.');
+    return;
+  }
   if (!forms.length) {
-    error('Please create a platform first.');
+    await batchBuildPackages(packs, packs);
     return;
   }
   if (platform && !validPlatform(forms, platform)) {
@@ -305,6 +437,7 @@ async function buildAction({
       : `start building platforms`
   );
   const pfs = await resortForms(forms, platform || undefined);
+  const usedPackages = analyzePrimaryPackagesFromPlatforms(packs, pfs);
   if (install) {
     const platNameSet = new Set(
       pfs.flatMap(pks => pks.map(({ name }) => name))
@@ -317,6 +450,7 @@ async function buildAction({
       )
     );
   }
+  await batchBuildPackages(packs, usedPackages);
   await batchBuild(pfs, mode, param);
 }
 

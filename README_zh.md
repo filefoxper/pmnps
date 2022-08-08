@@ -421,3 +421,7 @@ plugin 插件系统是自 `pmnps@2.0.0` 加入的，我们可以通过配置 `.p
 ### v2.1.2
 
 * 修复初始化时 prettier 无法加入 devDependencies 的问题。
+
+### v2.1.3
+
+* 为创建 platform 提供编译模型选择。

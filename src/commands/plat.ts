@@ -17,14 +17,16 @@ import path from 'path';
 import {
   basicDevDependencies,
   readPackageJson,
-  writeForbiddenManualInstall, writeGitIgnore,
+  writeBuildContent,
+  writeForbiddenManualInstall,
+  writeGitIgnore,
   writePackageJson,
   writePrettier
 } from '../resource';
 import fs from 'fs';
 import { Config } from '../type';
 import { refreshAction } from './refresh';
-import {info, log, success, warn} from '../info';
+import { info, log, success, warn } from '../info';
 import { readConfig } from '../root';
 
 const platsPath = path.join(rootPath, 'plats');
@@ -33,7 +35,8 @@ async function createPlatPackageJson(
   name: string,
   fileEnd: string,
   useReact: boolean,
-  rootConfig: Config
+  rootConfig: Config,
+  packageJson:Record<string, any> = {}
 ) {
   const isTs = fileEnd.startsWith('ts');
   const packageJsonPath = path.join(platsPath, name, 'package.json');
@@ -44,21 +47,22 @@ async function createPlatPackageJson(
         'react-dom': '16.14.0'
       }
     : {};
-  const { private:pri } = rootConfig;
+  const { private: pri } = rootConfig;
   const json = {
-    private:!!pri,
+    private: !!pri,
     name,
     description: 'This is a package in monorepo project',
     version: '1.0.0',
     scripts: {
       start: 'echo Please edit a start script.',
-      build: 'echo Please edit a build script.',
+      build: 'echo Please edit a build script.'
     },
     dependencies: reactDep,
     devDependencies: {
       ...basicDevDependencies,
       ...tsDep
-    }
+    },
+    ...packageJson
   };
   return writePackageJson(packageJsonPath, json);
 }
@@ -180,22 +184,96 @@ async function copyTemplate(name: string): Promise<boolean> {
   return false;
 }
 
+function parseModuleMode(
+  moduleMode: 'main' | 'module' | 'tool',
+  indexFile: string,
+  strictPackage?: boolean
+) {
+  const isTs = indexFile.endsWith('.ts') || indexFile.endsWith('tsx');
+  const scriptsPart = strictPackage
+    ? {
+        scripts: {
+          build: 'echo Please edit a build script.'
+        }
+      }
+    : undefined;
+  const typingPart =
+    strictPackage && isTs
+      ? {
+          typings: 'index.d.ts'
+        }
+      : undefined;
+  const binPart =
+    strictPackage && moduleMode === 'tool'
+      ? {
+          bin: 'bin/index.js'
+        }
+      : undefined;
+  const mainPart =
+    strictPackage && moduleMode === 'main'
+      ? {
+          main: 'dist/index.js'
+        }
+      : undefined;
+  const modulePart =
+    strictPackage && moduleMode === 'module'
+      ? {
+          module: 'esm/index.js'
+        }
+      : undefined;
+  const dirs: string[] = [
+    binPart ? 'bin' : undefined,
+    mainPart ? 'dist' : undefined,
+    modulePart ? 'esm' : undefined
+  ].filter((d): d is string => !!d);
+  const files: string[] = [typingPart ? 'index.d.ts' : undefined]
+    .filter((d): d is string => !!d)
+    .concat(dirs);
+  const packageJson = {
+    ...binPart,
+    ...mainPart,
+    module: strictPackage ? `src/${indexFile}` : indexFile,
+    ...modulePart,
+    ...typingPart,
+    ...scriptsPart,
+    files
+  };
+
+  return { dirs, packageJson };
+}
+
 async function createPlat(
   name: string,
   fileEnd: 'ts' | 'tsx' | 'js' | 'jsx',
   useReact: boolean,
-  rootConfig: Config
+  rootConfig: Config,
+  moduleMode: 'main' | 'module' | 'tool'
 ) {
+  const { strictPackage } = readConfig() || {};
   await mkdirIfNotExist(path.join(platsPath, name));
+  const fileName = `index.${fileEnd}`;
+  const { dirs, packageJson } = parseModuleMode(
+    moduleMode,
+    fileName,
+    strictPackage
+  );
+  const mks = strictPackage
+    ? dirs.map(async d => {
+        const dirPath = path.join(platsPath, name, d);
+        await mkdirIfNotExist(dirPath);
+        await writeBuildContent(dirPath);
+      })
+    : [];
   await Promise.all([
+    Promise.all(mks),
     mkdirIfNotExist(path.join(platsPath, name, 'src')),
-    createPlatPackageJson(name, fileEnd, useReact, rootConfig),
+    createPlatPackageJson(name, fileEnd, useReact, rootConfig,packageJson),
     createTsConfig(name, fileEnd, useReact),
     writePrettier(path.join(platsPath, name))
   ]);
   return createFileIntoDirIfNotExist(
     path.join(platsPath, name, 'src'),
-    `index.${fileEnd}`,
+    fileName,
     ['ts', 'tsx', 'js', 'jsx']
   );
 }
@@ -208,10 +286,7 @@ async function prettierProject(name: string, isNew: boolean) {
   } else {
     await execa(
       'prettier',
-      [
-        '--write',
-        path.join(platsPath, name, 'package.json')
-      ],
+      ['--write', path.join(platsPath, name, 'package.json')],
       {
         cwd: rootPath
       }
@@ -228,7 +303,7 @@ async function gitAddition(name: string, git?: boolean): Promise<void> {
   }
 }
 
-async function createPlatAction(name:string,rootConfig:Config){
+async function createPlatAction(name: string, rootConfig: Config) {
   const { format: ft } = await inquirer.prompt([
     {
       name: 'format',
@@ -238,6 +313,19 @@ async function createPlatAction(name:string,rootConfig:Config){
     }
   ]);
   const format = ft || 'js';
+  let moduleMode: 'main' | 'module' | 'tool' = 'main';
+  if (rootConfig.strictPackage) {
+    const { mode } = await inquirer.prompt([
+      {
+        name: 'mode',
+        type: 'list',
+        message: 'Is this package a module or a node tool?',
+        choices: ['main', 'module', 'tool'],
+        default: 'main'
+      }
+    ]);
+    moduleMode = mode;
+  }
   let useReact = false;
   if (format && format.endsWith('x')) {
     const { react } = await inquirer.prompt([
@@ -245,21 +333,25 @@ async function createPlatAction(name:string,rootConfig:Config){
         name: 'react',
         type: 'confirm',
         message:
-            'You have selected a `x` end format, do you want to use `React`?'
+          'You have selected a `x` end format, do you want to use `React`?'
       }
     ]);
     useReact = react;
   }
   info('config plat...');
-  await createPlat(name, format, useReact, rootConfig);
+  await createPlat(name, format, useReact, rootConfig, moduleMode);
 }
 
-async function flushPlatAction(name:string,rootConfig:Config,isNew:boolean){
+async function flushPlatAction(
+  name: string,
+  rootConfig: Config,
+  isNew: boolean
+) {
   const { git } = rootConfig;
   return Promise.all([
     refreshAction(),
     prettierProject(name, isNew),
-    gitAddition(name, git),
+    gitAddition(name, git)
   ]);
 }
 
@@ -290,20 +382,20 @@ async function platAction({ name: n }: { name?: string } | undefined = {}) {
   ]);
   const copied = await copyTemplate(name);
   if (!copied && !config) {
-    await createPlatAction(name,rootConfig);
+    await createPlatAction(name, rootConfig);
   } else {
     info('config plat...');
   }
-  const {publishable} = rootConfig;
-  if(!publishable){
+  const { publishable } = rootConfig;
+  if (!publishable) {
     await writeForbiddenManualInstall(path.join(platsPath, name));
   }
   const isNew = !config;
-  const [result] = await flushPlatAction(name,rootConfig,isNew);
-  if(!result){
+  const [result] = await flushPlatAction(name, rootConfig, isNew);
+  if (!result) {
     return;
   }
   success(`create platform "${name}" success`);
 }
 
-export { platAction,createPlatAction,flushPlatAction };
+export { platAction, createPlatAction, flushPlatAction };

@@ -417,3 +417,7 @@ plugin 插件系统是自 `pmnps@2.0.0` 加入的，我们可以通过配置 `.p
 ### v2.1.1
 
 * 添加了 `publish` 命令
+
+### v2.1.2
+
+* 修复初始化时 prettier 无法加入 devDependencies 的问题。

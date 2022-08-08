@@ -6,7 +6,7 @@ import path from 'path';
 import { rootPath } from '../file';
 import { error, log, warn } from '../info';
 import { Command } from 'commander';
-import {readConfig} from "@/root";
+import {readConfig} from "../root";
 
 type PackageType = 'package' | 'platform';
 

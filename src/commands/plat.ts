@@ -294,7 +294,10 @@ async function platAction({ name: n }: { name?: string } | undefined = {}) {
   } else {
     info('config plat...');
   }
-  await writeForbiddenManualInstall(path.join(platsPath, name));
+  const {publishable} = rootConfig;
+  if(!publishable){
+    await writeForbiddenManualInstall(path.join(platsPath, name));
+  }
   const isNew = !config;
   const [result] = await flushPlatAction(name,rootConfig,isNew);
   if(!result){

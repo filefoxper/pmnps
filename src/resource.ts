@@ -135,6 +135,29 @@ async function writePmnpsConfig(packageJsonPath: string, config: PmnpsConfig) {
   return writePackageJson(packageJsonPath, newJson);
 }
 
+function versionCheck(
+  current: string,
+  limit: [number, number, number] | string
+) {
+  const limitVersions =
+    typeof limit === 'string' ? limit.split('.').slice(0,3).map(d => Number(d)) : limit;
+  const currentVersions = current.split('.').slice(0,3).map(d => Number(d));
+  const result = limitVersions.reduce((r: number, v: number, i: number) => {
+    const c = currentVersions[i];
+    if (r !== 0) {
+      return r;
+    }
+    if (c > v) {
+      return 1;
+    }
+    if (c < v) {
+      return -1;
+    }
+    return 0;
+  }, 0);
+  return result >= 0;
+}
+
 export {
   basicDevDependencies,
   writePrettier,
@@ -145,5 +168,6 @@ export {
   writePackageJson,
   readPmnpsConfig,
   writePmnpsConfig,
-  writeBuildContent
+  writeBuildContent,
+  versionCheck
 };

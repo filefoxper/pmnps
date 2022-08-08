@@ -1,9 +1,6 @@
 import { program } from 'commander';
 import { initialAction } from './commands/initial';
-import {
-  commandRefresh,
-  fullRefreshAction,
-} from './commands/refresh';
+import { commandRefresh, fullRefreshAction } from './commands/refresh';
 import { commandStart, startAction } from './commands/start';
 import { buildAction, commandBuild } from './commands/build';
 import execa from 'execa';
@@ -13,15 +10,18 @@ import inquirer from 'inquirer';
 import { commandConfig, configAction } from './commands/config';
 import { readConfig, readConfigAsync } from './root';
 import { usePlugins } from './plugins';
-import {commandCreate, createAction} from './commands/create.command';
+import { commandCreate, createAction } from './commands/create.command';
+import { versionCheck } from './resource';
+import { commandPublish, publishAction } from './commands/publish.command';
 
 const actions: Record<string, (...args: any[]) => Promise<any>> = {
   start: startAction,
   refresh: fullRefreshAction,
-  create:createAction,
+  create: createAction,
   template: templateAction,
   build: buildAction,
-  config: configAction
+  config: configAction,
+  publish: publishAction
 };
 
 function defineCommander() {
@@ -46,7 +46,8 @@ function defineCommander() {
             'config',
             'create',
             'template',
-            'build'
+            'build',
+            'publish'
           ],
           default: 'start'
         }
@@ -62,24 +63,6 @@ function defineCommander() {
       }
       await actionCall();
     });
-}
-
-function versionCheck(current: string, limit: [number, number, number]) {
-  const currentVersions = current.split('.').map(d => Number(d));
-  const result = limit.reduce((r: number, v: number, i: number) => {
-    const c = currentVersions[i];
-    if (r !== 0) {
-      return r;
-    }
-    if (c > v) {
-      return 1;
-    }
-    if (c < v) {
-      return -1;
-    }
-    return 0;
-  }, 0);
-  return result >= 0;
 }
 
 function nodeSupport(stdout: string) {
@@ -123,6 +106,7 @@ async function startup() {
   commandBuild(program);
   commandTemplate(program);
   commandConfig(program);
+  commandPublish(program);
   program.parse();
 }
 

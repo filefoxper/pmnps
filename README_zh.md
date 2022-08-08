@@ -204,6 +204,20 @@ private/public project        # 限定 package.json 'private' 字段
 
 `template` 命令可以帮助我们创建相关 package 和 platform 的模版项目，在我们使用 `plat` 或 `pack` 命令时，能获取到它的帮助。
 
+### 使用 publish 命令
+
+该命令用于发布所有修改了版本号的 package 和 platform。
+
+```
+$ pmnps publish
+```
+
+如果发布账号设置了一次性安全密码，可以使用 `-o` 参数带入密码。
+
+```
+$ pmnps publish -o 123456
+```
+
 ## 配置 package.json
 
 我们可以通过添加 "pmnps" 属性来使用 pmnps 的增强功能。
@@ -399,3 +413,7 @@ plugin 插件系统是自 `pmnps@2.0.0` 加入的，我们可以通过配置 `.p
 * package 和 platform 命令合成为 create 命令
 * 去除了全局 build 模式设置项
 * 增加了 package build 模式设置
+
+### v2.1.1
+
+* 添加了 `publish` 命令

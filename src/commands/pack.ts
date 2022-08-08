@@ -216,7 +216,7 @@ async function copyTemplate(
 }
 
 function parseModuleMode(
-  moduleMode: 'module' | 'tool',
+  moduleMode: 'main' | 'module' | 'tool',
   indexFile: string,
   strictPackage?: boolean
 ) {
@@ -241,14 +241,21 @@ function parseModuleMode(
         }
       : undefined;
   const mainPart =
-    strictPackage && moduleMode === 'module'
+    strictPackage && moduleMode === 'main'
       ? {
           main: 'dist/index.js'
         }
       : undefined;
+  const modulePart =
+    strictPackage && moduleMode === 'module'
+      ? {
+          module: 'esm/index.js'
+        }
+      : undefined;
   const dirs: string[] = [
     binPart ? 'bin' : undefined,
-    mainPart ? 'dist' : undefined
+    mainPart ? 'dist' : undefined,
+    modulePart ? 'esm' : undefined
   ].filter((d): d is string => !!d);
   const files: string[] = [typingPart ? 'index.d.ts' : undefined]
     .filter((d): d is string => !!d)
@@ -257,6 +264,7 @@ function parseModuleMode(
     ...binPart,
     ...mainPart,
     module: strictPackage ? `src/${indexFile}` : indexFile,
+    ...modulePart,
     ...typingPart,
     ...scriptsPart,
     files
@@ -270,7 +278,7 @@ async function createPack(
   name: string,
   fileEnd: 'ts' | 'tsx' | 'js' | 'jsx',
   useReact: boolean,
-  moduleMode: 'module' | 'tool'
+  moduleMode: 'main' | 'module' | 'tool'
 ) {
   const { strictPackage } = readConfig() || {};
   await mkdirIfNotExist(pathJoin(packsPath, scope, name));
@@ -398,15 +406,15 @@ async function packAction({ name: n }: { name?: string } | undefined = {}) {
       }
     ]);
     const format = ft || 'js';
-    let moduleMode: 'module' | 'tool' = 'module';
+    let moduleMode: 'main' | 'module' | 'tool' = 'main';
     if (rootConfig.strictPackage) {
       const { mode } = await inquirer.prompt([
         {
           name: 'mode',
           type: 'list',
           message: 'Is this package a module or a node tool?',
-          choices: ['module', 'tool'],
-          default: 'module'
+          choices: ['main', 'module', 'tool'],
+          default: 'main'
         }
       ]);
       moduleMode = mode;
@@ -428,8 +436,10 @@ async function packAction({ name: n }: { name?: string } | undefined = {}) {
   } else {
     info('config package...');
   }
-  const { git } = rootConfig;
-  await writeForbiddenManualInstall(pathJoin(packsPath, scope, packName));
+  const { git, publishable } = rootConfig;
+  if (!publishable) {
+    await writeForbiddenManualInstall(pathJoin(packsPath, scope, packName));
+  }
   const isNew = !config;
   const [result] = await Promise.all([
     refreshAction(),

@@ -25,6 +25,7 @@ const gitignore = `node_modules/
 /.vscode/
 /dist/
 /bin/
+/esm/
 `;
 
 const basicDevDependencies = {

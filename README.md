@@ -432,3 +432,7 @@ And before config them, you should add the `plugin` into `devDependencies` in `p
 ### v2.1.1
 
 * add `publish` command.
+
+### v2.1.2
+
+* fix the problem that the `prettier` can not add to `devDependencies`.

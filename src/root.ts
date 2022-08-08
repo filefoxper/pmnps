@@ -103,7 +103,7 @@ async function writeRootPackageJson(workspace: string) {
     ...addition,
     devDependencies: newDev
   };
-  return writePackageJson(rootPackageJsonPath, content);
+  return writePackageJson(rootPackageJsonPath, content,true);
 }
 
 export {

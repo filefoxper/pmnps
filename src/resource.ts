@@ -43,8 +43,12 @@ async function readPackageJson<T extends PackageJson | PlatPackageJson>(
 
 async function writePackageJson(
   locationPath: string,
-  packageJson: Record<string, any>
+  packageJson: Record<string, any>,
+  force?:boolean
 ) {
+  if(force){
+    return writeJsonAsync(locationPath, packageJson);
+  }
   const { name, private: pri, scripts, ...prev } = packageJson;
   const nameEnd = name ? { name } : {};
   const privateEnd = pri != null ? { private: pri } : {};

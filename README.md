@@ -209,6 +209,20 @@ The `template` command can help you build some templates for `packages` and `pla
 $ pmnps template
 ```
 
+### use publish command
+
+The `publish` command can help you publish the packages and platforms.
+
+```
+$ pmnps publish
+```
+
+If you have set one password, please use `-o` to pass it in.
+
+```
+$ pmnps publish -o 123456
+```
+
 ## Package.json config
 
 Now, you can add `pmnps` property into your package.json in platforms or packages.
@@ -414,3 +428,7 @@ And before config them, you should add the `plugin` into `devDependencies` in `p
 * use `create` command to replace the old `package` and `platform` command.
 * deprecate the global `build mode` config
 * add the package build mode.
+
+### v2.1.1
+
+* add `publish` command.

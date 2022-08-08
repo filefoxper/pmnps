@@ -6,7 +6,8 @@ export type Config = {
   lock?: boolean;
   plugins?: Plugin[];
   strictPackage?: boolean;
-  private?:boolean
+  private?:boolean;
+  publishable?:boolean;
 };
 
 export type PmnpsConfig = {
@@ -18,6 +19,7 @@ export type PmnpsConfig = {
 
 export type PackageJson = {
   name: string;
+  private?:boolean;
   scripts?: Record<string, string>;
   version?: string;
   dependencies?: Record<string, string>;

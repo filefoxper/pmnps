@@ -452,3 +452,11 @@ And before config them, you should add the `plugin` into `devDependencies` in `p
 ### v2.1.6
 
 * listen to `SIGTERM\SIGKILL\SIGINT` for closing child process.
+
+### v2.1.7
+
+* try to kill the windows npx start
+
+### v2.1.8
+
+* fix the problem about windows can not kill child process.

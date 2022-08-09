@@ -437,3 +437,11 @@ plugin 插件系统是自 `pmnps@2.0.0` 加入的，我们可以通过配置 `.p
 ### v2.1.6
 
 * 监听 `SIGTERM\SIGKILL\SIGINT` 为关闭信号
+
+### v2.1.7
+
+* try to kill the windows npx start
+
+### v2.1.8
+
+* 修复 windows nodejs 无法杀死子进程的问题

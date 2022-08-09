@@ -444,3 +444,11 @@ And before config them, you should add the `plugin` into `devDependencies` in `p
 ### v2.1.4
 
 * fix the problem about `ctrl + c` can not kill the `pmnps start child process` problem.
+
+### v2.1.5
+
+* use `SIGKILL` to kill sub process.
+
+### v2.1.6
+
+* listen to `SIGTERM\SIGKILL\SIGINT` for closing child process.

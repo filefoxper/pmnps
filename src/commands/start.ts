@@ -70,7 +70,15 @@ async function startAction({ name: startPlat }: { name?: string }|undefined = {}
 
   // exist when cancelled.
   process.on('SIGINT',()=>{
-    subprocess.cancel();
+    subprocess.kill('SIGKILL');
+  });
+
+  process.on('SIGTERM',()=>{
+    subprocess.kill('SIGKILL');
+  });
+
+  process.on('SIGKILL',()=>{
+    subprocess.kill('SIGKILL');
   });
 }
 

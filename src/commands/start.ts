@@ -67,6 +67,11 @@ async function startAction({ name: startPlat }: { name?: string }|undefined = {}
   subprocess.stderr.pipe(process.stderr);
   // @ts-ignore
   subprocess.stdout.pipe(process.stdout);
+
+  // exist when cancelled.
+  process.on('SIGINT',()=>{
+    subprocess.cancel();
+  });
 }
 
 function commandStart(program: Command) {

@@ -440,3 +440,7 @@ And before config them, you should add the `plugin` into `devDependencies` in `p
 ### v2.1.3
 
 * make `create platform` have a build mode selection.
+
+### v2.1.4
+
+* fix the problem about `ctrl + c` can not kill the `pmnps start child process` problem.

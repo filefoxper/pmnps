@@ -68,18 +68,40 @@ async function startAction({ name: startPlat }: { name?: string }|undefined = {}
   // @ts-ignore
   subprocess.stdout.pipe(process.stdout);
 
+  const isWindows = process.platform === "win32"
+
+  if (isWindows) {
+    var rl = require("readline").createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    rl.on("SIGINT", function () {
+      process.emit("SIGINT");
+    });
+  }
+
   // exist when cancelled.
   process.on('SIGINT',()=>{
-    subprocess.kill('SIGKILL');
+    info('SIGINT closed...');
+    if(isWindows){
+      execa.commandSync(`taskkill /f /t /pid ${subprocess.pid}`);
+      process.exit();
+    }else{
+      subprocess.kill('SIGKILL');
+    }
   });
 
   process.on('SIGTERM',()=>{
-    subprocess.kill('SIGKILL');
+    info('SIGTERM closed...');
+    if(isWindows){
+      execa.commandSync(`taskkill /f /t /pid ${subprocess.pid}`);
+      process.exit();
+    }else{
+      subprocess.kill('SIGKILL');
+    }
   });
 
-  process.on('SIGKILL',()=>{
-    subprocess.kill('SIGKILL');
-  });
 }
 
 function commandStart(program: Command) {
